@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Чек-лист бухгалтерии</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Noto+Sans+Armenian:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: ledger board — team summary on top, one card per colleague, month totals at the bottom */
+:root{
+  --bg:#eef1f0; --surface:#ffffff; --ink:#18211e; --muted:#5d6b66; --line:#d5dcd9;
+  --accent:#1d6b57; --accent-soft:#dcebe5; --on-accent:#ffffff;
+  --warn:#a86d14; --warn-soft:#f6ead3; --bad:#b3412f; --bad-soft:#f5dcd6; --empty:#e3e8e6;
+  --f-ui:"Golos Text","Noto Sans Armenian",system-ui,sans-serif;
+  --f-num:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111614; --surface:#1a211e; --ink:#e5ece9; --muted:#93a39d; --line:#2c3632;
+  --accent:#4fb594; --accent-soft:#1d3a31; --on-accent:#0d1a15;
+  --warn:#e0a84a; --warn-soft:#3a2f1a; --bad:#e57a66; --bad-soft:#3d221d; --empty:#252e2a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111614; --surface:#1a211e; --ink:#e5ece9; --muted:#93a39d; --line:#2c3632;
+  --accent:#4fb594; --accent-soft:#1d3a31; --on-accent:#0d1a15;
+  --warn:#e0a84a; --warn-soft:#3a2f1a; --bad:#e57a66; --bad-soft:#3d221d; --empty:#252e2a; color-scheme:dark}
+
+*{box-sizing:border-box}
+html{color-scheme:light}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{margin:0;text-wrap:balance}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+
+/* top */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+.top h1{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.top .sub{color:var(--muted);font-size:13px;margin-top:2px}
+.nav{display:flex;align-items:center;gap:6px}
+.nav button{border:1px solid var(--line);background:var(--surface);border-radius:8px;height:36px;min-width:36px;padding:0 12px}
+.nav button:hover{border-color:var(--accent)}
+.nav .d{min-width:210px;text-align:center;font-weight:600}
+.nav .d small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.nav .today{color:var(--accent);font-weight:600}
+
+.team{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:grid;grid-template-columns:auto 1fr;gap:6px 20px;align-items:center}
+.team .big{font-size:30px;font-weight:600;line-height:1}
+.team .big span{color:var(--muted);font-size:18px}
+.team .lbl{color:var(--muted);font-size:13px}
+.team .chips{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chip{font-size:13px;border-radius:999px;padding:3px 10px;background:var(--empty)}
+.chip.full{background:var(--accent-soft);color:var(--accent)}
+.chip.part{background:var(--warn-soft);color:var(--warn)}
+.chip.none{background:var(--bad-soft);color:var(--bad)}
+.bar{height:6px;border-radius:3px;background:var(--empty);overflow:hidden}
+.bar span{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .25s}
+.note{font-size:13px;color:var(--warn);background:var(--warn-soft);border-radius:8px;padding:8px 12px}
+
+/* cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),1fr));gap:16px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.card-h h2{font-size:19px;font-weight:600}
+.card-h .cnt{font-size:14px;color:var(--muted)}
+.card-h .cnt b{color:var(--ink)}
+.week{display:flex;gap:4px;align-items:center}
+.week .lab{font-size:11px;color:var(--muted);margin-right:6px;text-transform:uppercase;letter-spacing:.06em}
+.cell{width:26px;height:26px;border-radius:6px;background:var(--empty);font-size:10px;display:grid;place-items:center;color:var(--muted)}
+.cell.full{background:var(--accent);color:var(--on-accent)}
+.cell.part{background:var(--warn-soft);color:var(--warn)}
+.cell.none{background:var(--bad-soft);color:var(--bad)}
+.cell.cur{outline:2px solid var(--ink);outline-offset:1px}
+.sec{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-top:4px}
+
+.tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.task{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.task:first-child{border-top:0}
+.task .nm{font-weight:500;overflow-wrap:anywhere}
+.task.done .nm{color:var(--muted)}
+.task .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:5px}
+.box{position:relative;width:24px;height:24px;margin-top:1px;cursor:pointer}
+.box span{position:absolute;inset:0;border:2px solid var(--line);border-radius:6px;background:var(--surface);transition:background .15s,border-color .15s}
+.box:hover span{border-color:var(--accent)}
+.box input:checked + span{background:var(--accent);border-color:var(--accent)}
+.box input:checked + span::after{content:"";position:absolute;left:6px;top:2px;width:6px;height:11px;border:solid var(--on-accent);border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.box input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
+.box input:disabled + span{cursor:default;opacity:.85}
+.tm{font-family:var(--f-num);font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--accent);padding:3px 6px;width:88px}
+.tm.ro{border-color:transparent;background:transparent;padding-left:0;width:auto}
+.cmt{flex:1;min-width:140px;font:inherit;font-size:13px;color:var(--ink);background:transparent;border:0;border-bottom:1px dashed var(--line);padding:3px 0}
+.cmt:focus{outline:none;border-bottom:1px solid var(--accent)}
+.cmt::placeholder{color:var(--muted);opacity:.7}
+.cmt.ro{border-bottom-color:transparent}
+.miss{font-size:12px;color:var(--bad)}
+
+.mon{display:flex;flex-direction:column;gap:2px;background:var(--bg);border-radius:10px;padding:10px 12px}
+.mt{padding:8px 0;border-top:1px solid var(--line)}
+.mt:first-of-type{border-top:0}
+.mt-h{display:flex;align-items:center;gap:10px}
+.mt-h .nm{flex:1;font-weight:500;overflow-wrap:anywhere;min-width:0}
+.badge{font-size:12px;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.badge.zero{background:var(--bad-soft);color:var(--bad)}
+.badge.ok{background:var(--accent-soft);color:var(--accent)}
+.add{border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:8px;padding:3px 10px;font-size:13px;font-weight:600;white-space:nowrap}
+.add:hover{background:var(--accent);color:var(--on-accent)}
+.ent{list-style:none;margin:6px 0 0;padding:0 0 0 2px;display:flex;flex-direction:column;gap:4px}
+.ent li{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px}
+.ent .when{font-family:var(--f-num);color:var(--muted);white-space:nowrap}
+.x{border:0;background:transparent;color:var(--muted);font-size:16px;line-height:1;padding:2px 6px;border-radius:6px}
+.x:hover{color:var(--bad);background:var(--bad-soft)}
+.confirm{display:flex;gap:6px}
+.confirm button{border:0;border-radius:6px;padding:2px 9px;font-size:12px}
+.confirm .yes{background:var(--bad);color:var(--surface)}
+.confirm .no{background:var(--empty)}
+
+/* month summary */
+.msum{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.msum h2{font-size:17px;font-weight:600}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;padding:6px 10px 8px 0;border-bottom:1px solid var(--line)}
+td{padding:10px 10px 10px 0;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td .pc{display:flex;align-items:center;gap:8px}
+td .pc .bar{width:90px}
+td .left{color:var(--bad);font-size:13px}
+td .allok{color:var(--accent);font-size:13px}
+
+.state{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:28px;text-align:center;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px)}
+@media (max-width:480px){
+  .nav .d{min-width:0;flex:1}
+  .nav{width:100%}
+  .cell{width:22px;height:22px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="state">Загружаю сотрудников и задачи…</div></div>
+<div class="toast" id="toast" hidden></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+const SUPABASE_URL='https://ksybudrrabwpwvazgdst.supabase.co';
+const SUPABASE_KEY='sb_publishable__cZjpex3yphF5nJpLZMJhw_jhQGlGU_';
+const START_DATE='2026-10-27';
+
+const MONTH_GEN=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const MONTH_NOM=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const WD=['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+const WD_S=['вс','пн','вт','ср','чт','пт','сб'];
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const parse=s=>{const a=s.split('-').map(Number);return new Date(a[0],a[1]-1,a[2]);};
+const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return ymd(d);};
+const today=()=>ymd(new Date());
+const nowTime=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes());};
+const monthOf=s=>s.slice(0,7);
+const monthStart=s=>s.slice(0,7)+'-01';
+const monthEnd=s=>{const d=parse(s);return ymd(new Date(d.getFullYear(),d.getMonth()+1,0));};
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const human=s=>{const d=parse(s);return d.getDate()+' '+MONTH_GEN[d.getMonth()];};
+const shortDate=s=>{const d=parse(s);return pad(d.getDate())+'.'+pad(d.getMonth()+1);};
+
+const S={view:today(),staff:[],daily:{},monthly:[],loaded:false,fatal:null,confirmDel:null};
+const app=document.getElementById('app');
+let toastT;
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3500);}
+
+if(!window.supabase){S.fatal='Не удалось загрузить страницу. Проверьте интернет и обновите её.';}
+const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
+
+/* ---------- stats ---------- */
+function dayStats(st,date){
+  const tasks=st.daily;let done=0;
+  tasks.forEach(t=>{const r=S.daily[date+'_'+t.id];if(r&&r.done)done++;});
+  return {done,total:tasks.length};
+}
+function cls(done,total){if(!total)return '';if(done>=total)return 'full';if(done>0)return 'part';return 'none';}
+function monthEntries(st,taskId){return S.monthly.filter(m=>m.staffId===st.id&&m.taskId===taskId).sort((a,b)=>(a.date+a.time)<(b.date+b.time)?-1:1);}
+function isCurMonth(){return monthOf(S.view)===monthOf(today());}
+function times(n){const a=n%10,b=n%100;if(a>=2&&a<=4&&(b<12||b>14))return 'раза';return 'раз';}
+
+/* ---------- render ---------- */
+function render(){
+  const act=document.activeElement,actId=act&&act.id;
+  let selS=null,selE=null,actVal=null;
+  if(actId&&act.tagName==='INPUT'){actVal=act.value;try{selS=act.selectionStart;selE=act.selectionEnd;}catch(e){}}
+  app.innerHTML=build();
+  if(actId){const el=document.getElementById(actId);if(el){if(actVal!=null&&el.type!=='checkbox')el.value=actVal;el.focus({preventScroll:true});try{if(selS!=null)el.setSelectionRange(selS,selE);}catch(e){}}}
+}
+
+function build(){
+  if(S.fatal) return '<div class="state">'+esc(S.fatal)+'</div>';
+  if(!S.loaded) return '<div class="state">Загружаю сотрудников и задачи…</div>';
+  const staff=S.staff;
+  const v=S.view,t=today(),isToday=v===t,editable=isToday;
+  const d=parse(v);
+  let h='';
+  h+='<header class="top"><div><h1>Чек-лист бухгалтерии</h1><div class="sub">Отмечайте свои задачи — время ставится автоматически</div></div>';
+  h+='<div class="nav"><button data-act="prev" aria-label="Предыдущий день">←</button>';
+  h+='<div class="d">'+human(v)+' '+d.getFullYear()+'<small>'+WD[d.getDay()]+(isToday?' · сегодня':'')+'</small></div>';
+  h+='<button data-act="next" aria-label="Следующий день"'+(v>=t?' disabled':'')+'>→</button>';
+  if(!isToday)h+='<button data-act="today" class="today">Сегодня</button>';
+  h+='</div></header>';
+
+  if(!staff.length){h+='<div class="state">Сотрудники ещё не добавлены.</div>';return h;}
+  if(!isToday)h+='<div class="note">Это прошлый день — только просмотр. Отмечать задачи можно на сегодняшней дате.</div>';
+
+  let td=0,tt=0;const chips=[];
+  staff.forEach(st=>{const s=dayStats(st,v);td+=s.done;tt+=s.total;chips.push('<span class="chip '+cls(s.done,s.total)+'">'+esc(st.name)+' · <span class="num">'+s.done+'/'+s.total+'</span></span>');});
+  const pct=tt?Math.round(td/tt*100):0;
+  h+='<section class="team" aria-label="Итог команды"><div class="big num">'+td+'<span> / '+tt+'</span></div>';
+  h+='<div><div class="lbl">ежедневных задач выполнено '+(isToday?'сегодня':'за '+human(v))+' · '+pct+'%</div><div class="bar" style="margin-top:6px"><span style="width:'+pct+'%"></span></div></div>';
+  h+='<div class="chips">'+chips.join('')+'</div></section>';
+
+  h+='<div class="grid">';
+  staff.forEach(st=>{h+=card(st,v,editable,isToday);});
+  h+='</div>';
+  h+=monthSummary(staff,v);
+  return h;
+}
+
+function card(st,v,editable,isToday){
+  const s=dayStats(st,v),p=s.total?Math.round(s.done/s.total*100):0;
+  let h='<article class="card"><div class="card-h"><h2>'+esc(st.name)+'</h2><div class="cnt"><b class="num">'+s.done+'</b> из <span class="num">'+s.total+'</span></div></div>';
+  h+='<div class="bar"><span style="width:'+p+'%"></span></div>';
+  h+='<div class="week"><span class="lab">7 дней</span>';
+  for(let i=6;i>=0;i--){
+    const dd=addDays(v,-i),ds=dayStats(st,dd),before=dd<START_DATE;
+    const c=before?'':cls(ds.done,ds.total);
+    h+='<div class="cell '+c+(i===0?' cur':'')+'" title="'+human(dd)+': '+(before?'нет данных':ds.done+' из '+ds.total)+'">'+WD_S[parse(dd).getDay()]+'</div>';
+  }
+  h+='</div>';
+  if(st.daily.length){
+    h+='<div class="sec">Ежедневные</div><ul class="tasks">';
+    st.daily.forEach(t=>{
+      const key=v+'_'+t.id,r=S.daily[key]||{},done=!!r.done;
+      h+='<li class="task'+(done?' done':'')+'"><label class="box" title="'+(done?'Снять отметку':'Отметить выполненной')+'"><input type="checkbox" class="sr" id="k_'+key+'" data-act="toggle" data-staff="'+st.id+'" data-task="'+t.id+'"'+(done?' checked':'')+(editable?'':' disabled')+'><span></span></label>';
+      h+='<div style="min-width:0"><div class="nm">'+esc(t.name)+'</div><div class="meta">';
+      if(done){
+        if(editable)h+='<input type="time" class="tm" id="t_'+key+'" data-act="time" data-staff="'+st.id+'" data-task="'+t.id+'" value="'+esc(r.time||'')+'" aria-label="Время выполнения">';
+        else h+='<span class="tm ro">✓ '+esc(r.time||'')+'</span>';
+      }else if(!isToday&&v>=START_DATE){h+='<span class="miss">не выполнено</span>';}
+      if(editable)h+='<input class="cmt" id="c_'+key+'" data-act="cmt" data-staff="'+st.id+'" data-task="'+t.id+'" value="'+esc(r.comment||'')+'" placeholder="Комментарий" maxlength="300">';
+      else if(r.comment)h+='<span class="cmt ro">'+esc(r.comment)+'</span>';
+      h+='</div></div></li>';
+    });
+    h+='</ul>';
+  }
+  if(st.monthly.length){
+    const cur=isCurMonth();
+    h+='<div class="mon"><div class="sec" style="margin:0 0 2px">В этом месяце · '+MONTH_NOM[parse(v).getMonth()]+'</div>';
+    st.monthly.forEach(t=>{
+      const ents=monthEntries(st,t.id),n=ents.length;
+      h+='<div class="mt"><div class="mt-h"><span class="nm">'+esc(t.name)+'</span><span class="badge '+(n?'ok':'zero')+'">'+(n?'выполнено '+n+' '+times(n):'не выполнено')+'</span>';
+      if(editable)h+='<button class="add" data-act="madd" data-staff="'+st.id+'" data-task="'+t.id+'">+ Выполнено</button>';
+      h+='</div>';
+      if(n){
+        h+='<ul class="ent">';
+        ents.forEach(e=>{
+          h+='<li><span class="when">'+shortDate(e.date)+', '+esc(e.time)+'</span>';
+          if(cur)h+='<input class="cmt" id="m_'+e.id+'" data-act="mcmt" data-id="'+e.id+'" value="'+esc(e.comment||'')+'" placeholder="Комментарий" maxlength="300">';
+          else if(e.comment)h+='<span>— '+esc(e.comment)+'</span>';
+          if(cur){
+            if(S.confirmDel===e.id)h+='<span class="confirm"><button class="yes" data-act="mdelyes" data-id="'+e.id+'">Удалить</button><button class="no" data-act="mdelno">Отмена</button></span>';
+            else h+='<button class="x" data-act="mdel" data-id="'+e.id+'" aria-label="Удалить отметку" title="Удалить отметку">×</button>';
+          }
+          h+='</li>';
+        });
+        h+='</ul>';
+      }
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+  return h+'</article>';
+}
+
+function monthSummary(staff,v){
+  const ms=monthStart(v),from=ms<START_DATE?START_DATE:ms,to=v;
+  const days=[];if(from<=to){for(let d=from;d<=to;d=addDays(d,1))days.push(d);}
+  let h='<section class="msum"><h2>Итоги месяца · '+MONTH_NOM[parse(v).getMonth()]+' '+parse(v).getFullYear()+'</h2>';
+  h+='<div class="tbl"><table><thead><tr><th>Сотрудник</th><th>Ежедневные</th><th>Полных дней</th><th>Ежемесячные</th><th>Ещё не выполнены</th></tr></thead><tbody>';
+  staff.forEach(st=>{
+    let d=0,t=0,full=0;
+    days.forEach(day=>{const s=dayStats(st,day);d+=s.done;t+=s.total;if(s.total&&s.done>=s.total)full++;});
+    const p=t?Math.round(d/t*100):0,mt=st.monthly,left=mt.filter(x=>!monthEntries(st,x.id).length);
+    h+='<tr><td><b>'+esc(st.name)+'</b></td>';
+    h+='<td>'+(t?'<div class="pc"><div class="bar"><span style="width:'+p+'%"></span></div><span class="num">'+p+'%</span></div>':'—')+'</td>';
+    h+='<td class="num">'+(days.length?full+' / '+days.length:'—')+'</td>';
+    h+='<td class="num">'+(mt.length?(mt.length-left.length)+' / '+mt.length:'—')+'</td>';
+    h+='<td>'+(mt.length?(left.length?'<span class="left">'+left.map(x=>esc(x.name)).join(', ')+'</span>':'<span class="allok">всё выполнено</span>'):'—')+'</td></tr>';
+  });
+  return h+'</tbody></table></div></section>';
+}
+
+/* ---------- data ---------- */
+let pending=0;
+async function loadStaff(){
+  const [a,b]=await Promise.all([
+    sb.from('staff').select('id,name,sort').order('sort'),
+    sb.from('tasks').select('id,staff_id,name,kind,sort,active').eq('active',true).order('sort')
+  ]);
+  if(a.error||b.error)throw a.error||b.error;
+  S.staff=a.data.map(s=>({id:s.id,name:s.name,
+    daily:b.data.filter(t=>t.staff_id===s.id&&t.kind==='daily'),
+    monthly:b.data.filter(t=>t.staff_id===s.id&&t.kind==='monthly')}));
+}
+async function loadChecks(){
+  const v=S.view,ms=monthStart(v),w=addDays(v,-6),from=w<ms?w:ms,to=monthEnd(v),mk=monthOf(v);
+  const [a,b]=await Promise.all([
+    sb.from('daily_checks').select('date,task_id,staff_id,done,time,comment').gte('date',from).lte('date',to).limit(5000),
+    sb.from('monthly_checks').select('id,month,task_id,staff_id,date,time,comment').eq('month',mk).limit(2000)
+  ]);
+  if(a.error||b.error)throw a.error||b.error;
+  if(pending>0||S.view!==v)return;
+  const m={};a.data.forEach(r=>{m[r.date+'_'+r.task_id]={date:r.date,staffId:r.staff_id,taskId:r.task_id,done:r.done,time:r.time,comment:r.comment};});
+  S.daily=m;
+  S.monthly=b.data.map(r=>({id:r.id,staffId:r.staff_id,taskId:r.task_id,date:r.date,time:r.time,comment:r.comment}));
+}
+let refreshT;
+function refreshSoon(withStaff){
+  clearTimeout(refreshT);
+  refreshT=setTimeout(async()=>{
+    try{if(withStaff)await loadStaff();await loadChecks();render();}catch(e){console.error(e);}
+  },400);
+}
+
+function onWriteError(e){console.error(e);toast('Не удалось сохранить. Проверьте интернет и попробуйте ещё раз.');refreshSoon(false);}
+const queues={};
+function enqueue(key,fn){
+  pending++;
+  const p=(queues[key]||Promise.resolve()).then(fn).then(r=>{if(r&&r.error)throw r.error;});
+  queues[key]=p.catch(()=>{});
+  return p.finally(()=>{pending--;});
+}
+function saveDaily(staffId,taskId,patch){
+  const date=S.view,key=date+'_'+taskId,cur=S.daily[key]||{date,staffId,taskId,done:false,time:null,comment:''};
+  const next=Object.assign({},cur,patch,{date,staffId,taskId});
+  S.daily[key]=next;render();
+  enqueue(key,()=>(!next.done&&!next.comment)
+    ? sb.from('daily_checks').delete().eq('date',date).eq('task_id',taskId)
+    : sb.from('daily_checks').upsert({date,task_id:taskId,staff_id:staffId,done:next.done,time:next.done?next.time:null,comment:next.comment||'',updated_at:new Date().toISOString()},{onConflict:'date,task_id'})
+  ).catch(onWriteError);
+}
+function addMonthly(staffId,taskId){
+  const t=today(),row={id:(crypto.randomUUID?crypto.randomUUID():null),month:monthOf(t),task_id:taskId,staff_id:staffId,date:t,time:nowTime(),comment:''};
+  if(!row.id)delete row.id;
+  if(row.id&&monthOf(S.view)===row.month){S.monthly.push({id:row.id,staffId,taskId,date:t,time:row.time,comment:''});render();}
+  enqueue('m_'+(row.id||Date.now()),()=>sb.from('monthly_checks').insert(row)).then(()=>refreshSoon(false)).catch(onWriteError);
+}
+
+/* ---------- events ---------- */
+function go(view){S.view=view;S.confirmDel=null;render();refreshSoon(false);}
+app.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const a=b.dataset.act;
+  if(a==='prev')go(addDays(S.view,-1));
+  else if(a==='next'){if(S.view<today())go(addDays(S.view,1));}
+  else if(a==='today')go(today());
+  else if(a==='madd')addMonthly(b.dataset.staff,b.dataset.task);
+  else if(a==='mdel'){S.confirmDel=b.dataset.id;render();}
+  else if(a==='mdelno'){S.confirmDel=null;render();}
+  else if(a==='mdelyes'){const id=b.dataset.id;S.confirmDel=null;S.monthly=S.monthly.filter(m=>m.id!==id);render();
+    enqueue('m_'+id,()=>sb.from('monthly_checks').delete().eq('id',id)).catch(onWriteError);}
+});
+app.addEventListener('change',e=>{
+  const el=e.target,a=el.dataset.act;if(!a)return;
+  if(a==='toggle'){
+    if(S.view!==today()){render();return;}
+    const on=el.checked;saveDaily(el.dataset.staff,el.dataset.task,{done:on,time:on?nowTime():null});
+  }else if(a==='time'){if(el.value)saveDaily(el.dataset.staff,el.dataset.task,{time:el.value});}
+  else if(a==='cmt'){saveDaily(el.dataset.staff,el.dataset.task,{comment:el.value.trim()});}
+  else if(a==='mcmt'){const id=el.dataset.id,val=el.value.trim(),m=S.monthly.find(x=>x.id===id);if(!m||m.comment===val)return;
+    m.comment=val;enqueue('m_'+id,()=>sb.from('monthly_checks').update({comment:val}).eq('id',id)).catch(onWriteError);}
+});
+app.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.classList.contains('cmt'))e.target.blur();});
+
+/* ---------- boot ---------- */
+let lastDay=today();
+setInterval(()=>{const t=today();if(t!==lastDay){if(S.view===lastDay)S.view=t;lastDay=t;}refreshSoon(false);},30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshSoon(true);});
+
+(async function boot(){
+  if(!sb){render();return;}
+  try{await loadStaff();await loadChecks();S.loaded=true;}
+  catch(e){console.error(e);S.fatal='Не удалось загрузить задачи. Проверьте интернет и обновите страницу.';}
+  render();
+  try{
+    sb.channel('checklist')
+      .on('postgres_changes',{event:'*',schema:'public',table:'daily_checks'},()=>refreshSoon(false))
+      .on('postgres_changes',{event:'*',schema:'public',table:'monthly_checks'},()=>refreshSoon(false))
+      .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},()=>refreshSoon(true))
+      .on('postgres_changes',{event:'*',schema:'public',table:'staff'},()=>refreshSoon(true))
+      .subscribe();
+  }catch(e){console.error(e);}
+})();
+})();
+</script>
+</body>
+</html>
