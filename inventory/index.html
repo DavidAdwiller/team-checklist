@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Инвентаризация ОС</title>
+<style>
+:root{--bg:#f5f5f2;--card:#fff;--ink:#1d1d1b;--mut:#6b6b66;--line:#e4e3de;--acc:#1f5fbf;--ok:#1d7a46;--okbg:#e5f4ea;--warn:#a35a00;--warnbg:#fdf0dc;--bad:#b3261e;--badbg:#fbe7e5;--r:12px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+button,input,select{font:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 14px}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+button.ghost{background:transparent;border-color:transparent;color:var(--acc);padding:6px 8px}
+button.sm{padding:5px 10px;font-size:13px}
+button:disabled{opacity:.45;cursor:default}
+input,select{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:#fff;width:100%}
+.wrap{max-width:760px;margin:0 auto;padding:12px 12px 120px}
+header.top{position:sticky;top:0;z-index:20;background:var(--bg);padding:10px 12px;border-bottom:1px solid var(--line)}
+header.top .row{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:8px}
+header.top h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin:10px 0}
+.mut{color:var(--mut)} .sm{font-size:13px}
+.h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin:22px 4px 6px}
+.pt{display:flex;align-items:center;gap:10px;cursor:pointer}
+.pt .nm{flex:1;min-width:0}
+.pill{display:inline-block;font-size:12px;border-radius:999px;padding:2px 8px;background:#eee;color:var(--mut);white-space:nowrap}
+.pill.open{background:var(--warnbg);color:var(--warn)} .pill.closed{background:var(--okbg);color:var(--ok)}
+.cat-h{display:flex;align-items:center;gap:10px}
+.cat-h .t{flex:1;font-weight:600}
+.ic{flex:none;color:#3b3b37}
+.mrow{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.mrow:first-of-type{border-top:0}
+.mic{position:relative;width:44px;height:44px;border-radius:10px;background:#f0efea;display:flex;align-items:center;justify-content:center;flex:none;border:0;padding:0}
+.mic .dot{position:absolute;right:-3px;top:-3px;width:16px;height:16px;border-radius:50%;background:var(--acc);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center}
+.mic img{width:44px;height:44px;object-fit:cover;border-radius:10px}
+.mbody{flex:1;min-width:0}
+.mname{font-weight:500;word-break:break-word}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.chip{font-size:12px;border-radius:7px;padding:3px 7px;background:#eeede8;color:var(--mut);font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:4px}
+.chip.ok{background:var(--okbg);color:var(--ok)} .chip.mv{background:var(--warnbg);color:var(--warn)} .chip.bad{background:var(--badbg);color:var(--bad)}
+.chip b{font-weight:600;cursor:pointer;padding-left:2px}
+.cnt{font-size:13px;margin-top:2px}
+.cnt .ok{color:var(--ok);font-weight:600} .cnt .bad{color:var(--bad);font-weight:600}
+.qty{display:flex;align-items:center;gap:6px;margin-top:6px}
+.qty input{width:80px;text-align:center}
+.qty button{width:38px;padding:7px 0}
+.scanbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+.scanbar .row{max-width:760px;margin:0 auto;display:flex;gap:8px}
+.scanbar input{flex:1}
+.modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--card);width:100%;max-width:760px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 14px calc(16px + env(safe-area-inset-bottom))}
+@media(min-width:700px){.modal{align-items:center}.sheet{border-radius:16px}}
+.sheet h3{margin:0 0 10px;font-size:17px}
+.list .it{display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid var(--line);cursor:pointer}
+.list .it:hover{background:#faf9f6}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:90px;z-index:60;padding:10px 16px;border-radius:12px;color:#fff;background:#333;max-width:92vw;box-shadow:0 4px 18px rgba(0,0,0,.2);font-weight:500}
+.toast.ok{background:var(--ok)} .toast.mv{background:var(--warn)} .toast.bad{background:var(--bad)}
+#reader{width:100%;border-radius:12px;overflow:hidden;background:#000;min-height:220px}
+.big{width:100%;max-height:65vh;object-fit:contain;border-radius:12px;background:#f0efea}
+.tabs{display:flex;gap:6px;overflow:auto;margin:6px 0}
+.tabs button{white-space:nowrap}.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.banner{background:var(--okbg);color:var(--ok);border-radius:10px;padding:10px 12px;margin:10px 0}
+.res h4{margin:16px 0 6px}
+.res .r{padding:7px 0;border-top:1px solid var(--line);font-size:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ptl{max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px}
+.ptl label{display:flex;gap:8px;align-items:center;padding:4px}
+.ptl input{width:auto}
+.err{color:var(--bad);margin-top:8px}
+.center{text-align:center}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal-root"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="icons.js"></script>
+<script>
+'use strict';
+const SUPABASE_URL = 'https://ksybudrrabwpwvazgdst.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__cZjpex3yphF5nJpLZMJhw_jhQGlGU_';
+const BUCKET = 'fa-photos';
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+const S = { auth: null, points: [], cats: [], catById: {}, models: {}, cur: null, view: 'login',
+            extraModels: {}, extraCats: [], adminTab: 'points', busy: false };
+
+// ---------- утилиты ----------
+const $ = (sel, el) => (el || document).querySelector(sel);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const photoUrl = p => p ? SUPABASE_URL + '/storage/v1/object/public/' + BUCKET + '/' + p : '';
+const isAdmin = () => S.auth && S.auth.role === 'admin';
+function store(k, v) { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function load(k) { try { return JSON.parse(sessionStorage.getItem(k)); } catch (e) { return null; } }
+
+let toastT;
+function toast(msg, kind) {
+  let t = $('.toast'); if (!t) { t = document.createElement('div'); document.body.appendChild(t); }
+  t.className = 'toast ' + (kind || ''); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toastT); toastT = setTimeout(() => { t.style.display = 'none'; }, kind === 'bad' ? 5000 : 2600);
+  if (navigator.vibrate) navigator.vibrate(kind === 'bad' ? [80, 60, 80] : 40);
+}
+
+async function rpc(fn, args) {
+  if (!sb) throw new Error('Не удалось загрузить страницу. Проверьте интернет.');
+  const { data, error } = await sb.rpc(fn, args);
+  if (error) throw new Error(error.message);
+  if (data && data.ok === false) throw new Error(data.error || 'Ошибка');
+  return data;
+}
+const cred = () => ({ p_name: isAdmin() ? '@admin' : S.auth.name, p_pin: S.auth.pin });
+
+function modal(html, onMount) {
+  const root = $('#modal-root');
+  root.innerHTML = '<div class="modal"><div class="sheet">' + html + '</div></div>';
+  const m = root.firstChild;
+  m.addEventListener('click', e => { if (e.target === m) closeModal(); });
+  if (onMount) onMount(m.firstChild);
+  return m.firstChild;
+}
+function closeModal() { stopScanner(); $('#modal-root').innerHTML = ''; }
+
+// ---------- вход ----------
+function viewLogin(err) {
+  const admin = S.loginAdmin;
+  $('#app').innerHTML = `
+  <div class="wrap" style="max-width:420px;padding-top:12vh">
+    <div class="center" style="margin-bottom:16px">${faIcon('box', 44)}<h2 style="margin:8px 0 0">Инвентаризация ОС</h2>
+      <div class="mut sm">${admin ? 'Вход администратора' : 'Вход для материально ответственных'}</div></div>
+    <div class="card">
+      ${admin ? '' : '<label class="sm mut">Имя</label><input id="ln" autocomplete="username" style="margin:4px 0 10px">'}
+      <label class="sm mut">${admin ? 'Пароль' : 'PIN'}</label>
+      <input id="lp" type="password" ${admin ? '' : 'inputmode="numeric"'} autocomplete="current-password" style="margin:4px 0 12px">
+      <button class="pri" id="lb" style="width:100%">Войти</button>
+      ${err ? '<div class="err">' + esc(err) + '</div>' : ''}
+    </div>
+    <div class="center"><button class="ghost sm" id="lt">${admin ? 'Я материально ответственный' : 'Вход администратора'}</button></div>
+  </div>`;
+  const go = async () => {
+    const name = admin ? '@admin' : $('#ln').value.trim(), pin = $('#lp').value;
+    $('#lb').disabled = true;
+    try { await doLogin(name, pin); } catch (e) { viewLogin(e.message); }
+  };
+  $('#lb').onclick = go;
+  $('#lp').onkeydown = e => { if (e.key === 'Enter') go(); };
+  $('#lt').onclick = () => { S.loginAdmin = !admin; viewLogin(); };
+  (admin ? $('#lp') : $('#ln')).focus();
+}
+
+async function doLogin(name, pin) {
+  const d = await rpc('fa_login', { p_name: name, p_pin: pin });
+  S.auth = { name: d.name === 'Администратор' && name === '@admin' ? '@admin' : d.name, display: d.name, pin, role: d.role };
+  S.points = d.points || [];
+  S.cats = d.categories || [];
+  S.catById = {}; S.cats.forEach(c => S.catById[c.id] = c);
+  S.models = {}; (d.models || []).forEach(m => S.models[m[0]] = { id: m[0], name: m[1], cat: m[2], photo: m[3] });
+  store('fa_auth', { name, pin });
+  if (isAdmin()) { S.view = 'admin'; renderAdmin(); } else { S.view = 'points'; renderPoints(); }
+}
+function logout() { store('fa_auth', null); S.auth = null; S.cur = null; S.view = 'login'; viewLogin(); }
+
+async function refreshPoints() {
+  const a = load('fa_auth'); const d = await rpc('fa_login', { p_name: a.name, p_pin: a.pin });
+  S.points = d.points || [];
+}
+
+// ---------- список точек ----------
+function statusPill(p) {
+  return p.status === 'closed' ? '<span class="pill closed">закрыта</span>'
+       : p.status === 'open' ? '<span class="pill open">идёт · ' + p.lines + '</span>' : '<span class="pill">не начата</span>';
+}
+function pointCard(p) {
+  return `<div class="card pt" data-pt="${esc(p.code)}">${faIcon(p.is_branch ? 'kiosk' : 'box', 30)}
+    <div class="nm"><div style="font-weight:600">${esc(p.name)}</div>
+    <div class="sm mut">код ${esc(p.code)} · по учёту ${p.booked}${p.mol ? ' · ' + esc(p.mol) : ''}</div></div>${statusPill(p)}</div>`;
+}
+function renderPoints() {
+  $('#app').innerHTML = `
+  <header class="top"><div class="row"><h1>Мои точки</h1><span class="sm mut">${esc(S.auth.display)}</span><button class="ghost sm" id="lo">Выйти</button></div></header>
+  <div class="wrap">${S.points.length ? S.points.map(pointCard).join('') :
+    '<div class="card mut">За вами пока не закреплено ни одной точки. Обратитесь к администратору.</div>'}</div>`;
+  $('#lo').onclick = logout;
+  document.querySelectorAll('[data-pt]').forEach(el => el.onclick = () => openPoint(el.dataset.pt));
+}
+
+// ---------- точка ----------
+async function openPoint(code, keepScroll) {
+  const y = window.scrollY;
+  const d = await rpc('fa_point', Object.assign(cred(), { p_point: code }));
+  if (!S.cur || S.cur.code !== code) { S.extraModels = {}; S.extraCats = []; }
+  S.cur = { code, point: d.point, status: d.status, booked: d.booked, lines: d.lines };
+  S.view = 'point'; renderPoint();
+  if (keepScroll) window.scrollTo(0, y); else window.scrollTo(0, 0);
+}
+const reload = () => openPoint(S.cur.code, true);
+const closed = () => S.cur && S.cur.status === 'closed';
+
+function catData(catId) {
+  const c = S.catById[catId];
+  const models = new Map();
+  const get = id => { if (!models.has(id)) models.set(id, { id, booked: [], lines: [] }); return models.get(id); };
+  S.cur.booked.forEach(([inv, mid]) => { const m = S.models[mid]; if (m && m.cat === catId) get(mid).booked.push(inv); });
+  const custom = [];
+  S.cur.lines.forEach(l => {
+    if (l.cat !== catId) return;
+    if (l.model) get(l.model).lines.push(l); else custom.push(l);
+  });
+  (S.extraModels[catId] || []).forEach(id => get(id));
+  return { c, models: [...models.values()].sort((a, b) => (b.booked.length - a.booked.length) || S.models[a.id].name.localeCompare(S.models[b.id].name)), custom };
+}
+
+function modelIcon(m, c) {
+  const inner = m.photo ? '<img src="' + esc(photoUrl(m.photo)) + '" alt="" loading="lazy">' : faIcon(c.icon, 26);
+  return '<button class="mic" data-photo="' + m.id + '" title="Фото модели">' + inner + (m.photo ? '' : '<span class="dot">+</span>') + '</button>';
+}
+
+function modelRow(md, c) {
+  const m = S.models[md.id], dis = closed() ? 'disabled' : '';
+  if (c.count_only) {
+    const q = md.lines.find(l => l.result === 'qty');
+    return `<div class="mrow">${modelIcon(m, c)}<div class="mbody"><div class="mname">${esc(m.name)}</div>
+      <div class="cnt mut">По учёту: ${md.booked.length}${q ? ' · факт: <span class="' + (q.qty >= md.booked.length ? 'ok' : 'bad') + '">' + q.qty + '</span>' : ''}</div>
+      <div class="qty"><button class="sm" data-q="${m.id}" data-d="-1" ${dis}>−</button>
+        <input type="number" min="0" inputmode="numeric" data-qi="${m.id}" value="${q ? q.qty : ''}" placeholder="факт" ${dis}>
+        <button class="sm" data-q="${m.id}" data-d="1" ${dis}>+</button>
+        ${md.booked.length && !q ? '<button class="sm" data-qall="' + m.id + '" data-n="' + md.booked.length + '" ' + dis + '>всё на месте</button>' : ''}</div></div></div>`;
+  }
+  const scanned = new Set(md.lines.filter(l => l.inv).map(l => l.inv));
+  const nolabel = md.lines.filter(l => l.result === 'nolabel');
+  const nl = nolabel.reduce((s, l) => s + l.qty, 0);
+  const found = md.lines.filter(l => l.inv).length + nl;
+  const chips = md.booked.map(inv => '<span class="chip ' + (scanned.has(inv) ? 'ok' : '') + '">' + (scanned.has(inv) ? '✓ ' : '') + esc(inv) + '</span>').join('')
+    + md.lines.filter(l => l.inv && !md.booked.includes(l.inv)).map(l => '<span class="chip mv" title="' + esc(l.result === 'moved' ? 'числится: ' + (l.from_name || l.from) : 'нет в реестре') + '">'
+        + (l.result === 'moved' ? '→ ' : '? ') + esc(l.inv) + (closed() ? '' : ' <b data-del="' + l.id + '">×</b>') + '</span>').join('')
+    + nolabel.map(l => '<span class="chip mv">без наклейки' + (closed() ? '' : ' <b data-del="' + l.id + '">×</b>') + '</span>').join('');
+  const cls = found >= md.booked.length ? 'ok' : 'bad';
+  return `<div class="mrow">${modelIcon(m, c)}<div class="mbody"><div class="mname">${esc(m.name)}</div>
+    <div class="cnt mut">По учёту: ${md.booked.length} · найдено: <span class="${md.booked.length || found ? cls : ''}">${found}</span></div>
+    <div class="chips">${chips}</div>
+    <div style="margin-top:6px"><button class="sm" data-nl="${m.id}" ${dis}>+ без наклейки</button></div></div></div>`;
+}
+
+function catCard(catId) {
+  const { c, models, custom } = catData(catId);
+  const customHtml = custom.map(l => `<div class="mrow"><div class="mic">${l.photo ? '<img src="' + esc(photoUrl(l.photo)) + '" alt="">' : faIcon(c.icon, 26)}</div>
+     <div class="mbody"><div class="mname">${esc(l.custom || 'Без названия')}</div>
+     <div class="chips"><span class="chip mv">${l.result === 'unknown' ? '? ' + esc(l.inv) : 'нет в справочнике'} · ${l.qty} шт.${closed() ? '' : ' <b data-del="' + l.id + '">×</b>'}</span></div></div></div>`).join('');
+  return `<div class="card" id="cat-${c.id}"><div class="cat-h">${faIcon(c.icon, 26)}<div class="t">${esc(c.name)}</div>
+      ${c.count_only ? '<span class="pill">по количеству</span>' : ''}</div>
+    <div style="margin-top:6px">${models.length ? models.map(md => modelRow(md, c)).join('') : '<div class="mut sm" style="padding:8px 0">По учёту нет</div>'}${customHtml}</div>
+    ${closed() ? '' : '<button class="ghost sm" data-addm="' + c.id + '">+ другая модель</button>'}</div>`;
+}
+
+function renderPoint() {
+  const P = S.cur, kit = S.cats.filter(c => c.in_kit);
+  const other = S.cats.filter(c => !c.in_kit && (S.cur.booked.some(([, mid]) => S.models[mid] && S.models[mid].cat === c.id)
+      || S.cur.lines.some(l => l.cat === c.id) || S.extraCats.includes(c.id)));
+  const rest = S.cats.filter(c => !c.in_kit && !other.includes(c));
+  $('#app').innerHTML = `
+  <header class="top"><div class="row"><button class="ghost" id="bk">←</button><h1>${esc(P.point.name)}</h1><button class="sm" id="rs">Итоги</button></div></header>
+  <div class="wrap">
+    ${closed() ? '<div class="banner">Опись по точке закрыта. Изменения не принимаются' + (isAdmin() ? ' — можно открыть заново в «Итогах».' : '.') + '</div>' : ''}
+    <div class="sm mut" style="margin:4px">${P.point.mol ? 'МОЛ по учёту: ' + esc(P.point.mol) + ' · ' : ''}по учёту ${P.booked.length} позиций</div>
+    <div class="h2">Типовой набор</div>
+    ${kit.map(c => catCard(c.id)).join('')}
+    <div class="h2">Другое на точке</div>
+    ${other.map(c => catCard(c.id)).join('')}
+    ${closed() ? '' : `<div class="card"><label class="sm mut">Добавить категорию</label>
+      <select id="addcat" style="margin-top:4px"><option value="">Выберите категорию…</option>${rest.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('')}</select></div>`}
+  </div>
+  ${closed() ? '' : `<div class="scanbar"><div class="row"><button class="pri" id="cam">📷 Скан</button>
+     <input id="inv" placeholder="или введите номер" inputmode="numeric" autocomplete="off"><button id="invb">OK</button></div></div>`}`;
+  bindPoint();
+}
+
+function bindPoint() {
+  $('#bk').onclick = async () => { S.cur = null; if (isAdmin()) { S.view = 'admin'; await refreshPoints(); renderAdmin(); } else { await refreshPoints(); S.view = 'points'; renderPoints(); } };
+  $('#rs').onclick = showResults;
+  const app = $('#app');
+  app.querySelectorAll('[data-photo]').forEach(b => b.onclick = () => openPhoto(+b.dataset.photo));
+  app.querySelectorAll('[data-del]').forEach(b => b.onclick = async e => {
+    e.stopPropagation(); if (!confirm('Убрать эту отметку?')) return;
+    await act(() => rpc('fa_delete_line', Object.assign(cred(), { p_point: S.cur.code, p_line: +b.dataset.del })));
+  });
+  app.querySelectorAll('[data-nl]').forEach(b => b.onclick = () => act(() => rpc('fa_add', Object.assign(cred(), {
+    p_point: S.cur.code, p_kind: 'nolabel', p_category: null, p_model: +b.dataset.nl, p_custom: null, p_inv: null, p_qty: 1, p_photo: null, p_note: null })), 'Отмечено без наклейки'));
+  app.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
+    const inp = app.querySelector('[data-qi="' + b.dataset.q + '"]'); const v = Math.max(0, (parseInt(inp.value, 10) || 0) + (+b.dataset.d));
+    setQty(+b.dataset.q, v);
+  });
+  app.querySelectorAll('[data-qall]').forEach(b => b.onclick = () => setQty(+b.dataset.qall, +b.dataset.n));
+  app.querySelectorAll('[data-qi]').forEach(inp => inp.onchange = () => setQty(+inp.dataset.qi, inp.value === '' ? null : Math.max(0, parseInt(inp.value, 10) || 0)));
+  app.querySelectorAll('[data-addm]').forEach(b => b.onclick = () => pickModel(+b.dataset.addm, onPicked));
+  const ac = $('#addcat'); if (ac) ac.onchange = () => { if (ac.value) { S.extraCats.push(+ac.value); const id = +ac.value; renderPoint(); const el = $('#cat-' + id); if (el) el.scrollIntoView({ behavior: 'smooth' }); } };
+  const cam = $('#cam'); if (cam) cam.onclick = openScanner;
+  const inv = $('#inv'); if (inv) {
+    const go = () => { const v = inv.value.trim(); if (v) { inv.value = ''; doScan(v); } };
+    $('#invb').onclick = go; inv.onkeydown = e => { if (e.key === 'Enter') go(); };
+  }
+}
+
+async function act(fn, okMsg) {
+  if (S.busy) return; S.busy = true;
+  try { await fn(); if (okMsg) toast(okMsg, 'ok'); await reload(); }
+  catch (e) { toast(e.message, 'bad'); }
+  finally { S.busy = false; }
+}
+const setQty = (mid, q) => act(() => rpc('fa_set_qty', Object.assign(cred(), { p_point: S.cur.code, p_model: mid, p_qty: q })));
+
+function onPicked(catId, res) {
+  const c = S.catById[catId];
+  if (res.custom) { customForm(catId, res.custom); return; }
+  const list = S.extraModels[catId] || (S.extraModels[catId] = []);
+  if (!list.includes(res.model)) list.push(res.model);
+  closeModal(); renderPoint();
+  const el = $('#cat-' + catId); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toast(c.count_only ? 'Укажите количество' : 'Отсканируйте номер или нажмите «без наклейки»');
+}
+
+// ---------- выбор модели ----------
+function pickModel(catId, cb, title) {
+  const c = S.catById[catId];
+  const here = new Set(S.cur.booked.map(b => b[1]));
+  const all = Object.values(S.models).filter(m => m.cat === catId)
+    .sort((a, b) => (here.has(b.id) - here.has(a.id)) || a.name.localeCompare(b.name));
+  const sh = modal(`<h3>${esc(title || c.name)}</h3><input id="ms" placeholder="Поиск модели…" autocomplete="off">
+    <div class="list" id="ml" style="margin-top:8px"></div>
+    <div class="card" style="margin-top:12px"><div class="sm mut">Нет в списке?</div>
+      <div style="display:flex;gap:8px;margin-top:6px"><input id="mc" placeholder="Название, как на вещи"><button id="mcb">Добавить</button></div></div>
+    <div class="center" style="margin-top:10px"><button class="ghost" id="mx">Отмена</button></div>`);
+  const draw = q => {
+    const f = q ? all.filter(m => m.name.toLowerCase().includes(q.toLowerCase())) : all;
+    $('#ml', sh).innerHTML = f.slice(0, 200).map(m => `<div class="it" data-m="${m.id}">
+      <div class="mic">${m.photo ? '<img src="' + esc(photoUrl(m.photo)) + '" alt="" loading="lazy">' : faIcon(c.icon, 24)}</div>
+      <div style="flex:1">${esc(m.name)}${here.has(m.id) ? ' <span class="pill">на этой точке</span>' : ''}</div></div>`).join('')
+      || '<div class="mut sm" style="padding:10px">Ничего не найдено</div>';
+    sh.querySelectorAll('[data-m]').forEach(el => el.onclick = () => cb(catId, { model: +el.dataset.m }));
+  };
+  draw('');
+  $('#ms', sh).oninput = e => draw(e.target.value.trim());
+  $('#mcb', sh).onclick = () => { const v = $('#mc', sh).value.trim(); if (v) cb(catId, { custom: v }); };
+  $('#mx', sh).onclick = closeModal;
+}
+
+// форма для вещи без карточки/без модели в справочнике
+function customForm(catId, name, inv) {
+  const c = S.catById[catId];
+  const sh = modal(`<h3>${inv ? 'Номер ' + esc(inv) + ' не найден в реестре' : 'Нет в справочнике'}</h3>
+    <div class="sm mut">${esc(c.name)}</div>
+    <label class="sm mut" style="display:block;margin-top:10px">Название</label><input id="cn" value="${esc(name || '')}">
+    <div class="grid2" style="margin-top:10px"><div><label class="sm mut">Количество</label><input id="cq" type="number" min="1" value="1" inputmode="numeric" ${inv ? 'disabled' : ''}></div>
+      <div><label class="sm mut">Фото</label><input id="cf" type="file" accept="image/*" capture="environment"></div></div>
+    <label class="sm mut" style="display:block;margin-top:10px">Комментарий</label><input id="cm" placeholder="необязательно">
+    <div style="display:flex;gap:8px;margin-top:14px"><button class="pri" id="cs" style="flex:1">Сохранить</button><button id="cx">Отмена</button></div>`);
+  $('#cx', sh).onclick = closeModal;
+  $('#cs', sh).onclick = async () => {
+    const nm = $('#cn', sh).value.trim(); if (!nm) { toast('Впишите название', 'bad'); return; }
+    $('#cs', sh).disabled = true;
+    try {
+      let path = null; const f = $('#cf', sh).files[0];
+      if (f) path = await uploadPhoto(f, 's' + S.cur.code);
+      await rpc('fa_add', Object.assign(cred(), { p_point: S.cur.code, p_kind: inv ? 'unknown' : 'custom', p_category: catId, p_model: null,
+        p_custom: nm, p_inv: inv || null, p_qty: +$('#cq', sh).value || 1, p_photo: path, p_note: $('#cm', sh).value }));
+      closeModal(); toast('Добавлено как излишек', 'mv'); await reload();
+    } catch (e) { toast(e.message, 'bad'); $('#cs', sh).disabled = false; }
+  };
+}
+
+// ---------- скан ----------
+async function doScan(code) {
+  try {
+    const r = await rpc('fa_scan', Object.assign(cred(), { p_point: S.cur.code, p_inv: code }));
+    const m = r.model && S.models[r.model];
+    if (r.status === 'here') toast('✓ ' + r.inv + ' — ' + (m ? m.name : ''), 'ok');
+    else if (r.status === 'moved') toast('→ ' + r.inv + ' числится: ' + (r.from || '') + '. Отмечено как перемещение', 'mv');
+    else if (r.status === 'already') toast(r.inv + ' уже отмечен');
+    else if (r.status === 'unknown') { stopScanner(); unknownFlow(r.inv); return; }
+    if (r.status !== 'already') await reload();
+  } catch (e) { toast(e.message, 'bad'); }
+}
+
+function unknownFlow(inv) {
+  const sh = modal(`<h3>Номер ${esc(inv)} не найден в реестре</h3>
+    <div class="sm mut">Выберите, что это за вещь — она попадёт в излишки.</div>
+    <div class="list" style="margin-top:8px">${S.cats.map(c => '<div class="it" data-c="' + c.id + '">' + faIcon(c.icon, 24) + '<div>' + esc(c.name) + '</div></div>').join('')}</div>
+    <div class="center" style="margin-top:10px"><button class="ghost" id="ux">Отмена</button></div>`);
+  $('#ux', sh).onclick = closeModal;
+  sh.querySelectorAll('[data-c]').forEach(el => el.onclick = () => {
+    const cid = +el.dataset.c;
+    pickModel(cid, async (catId, res) => {
+      if (res.custom) { customForm(catId, res.custom, inv); return; }
+      try {
+        await rpc('fa_add', Object.assign(cred(), { p_point: S.cur.code, p_kind: 'unknown', p_category: catId, p_model: res.model,
+          p_custom: null, p_inv: inv, p_qty: 1, p_photo: null, p_note: null }));
+        closeModal(); toast('Добавлено как излишек', 'mv'); await reload();
+      } catch (e) { toast(e.message, 'bad'); }
+    }, 'Номер ' + inv + ': какая модель?');
+  });
+}
+
+let scanner = null, lastCode = '', lastAt = 0, scanBusy = false;
+function openScanner() {
+  if (!window.Html5Qrcode) { toast('Сканер не загрузился. Введите номер вручную.', 'bad'); return; }
+  modal(`<h3>Сканирование</h3><div id="reader"></div>
+    <div class="sm mut" style="margin-top:8px">Наведите камеру на штрихкод. Можно сканировать подряд.</div>
+    <div id="slast" class="sm" style="margin-top:6px"></div>
+    <div class="center" style="margin-top:10px"><button id="sx">Готово</button></div>`);
+  $('#sx').onclick = closeModal;
+  const F = Html5QrcodeSupportedFormats;
+  scanner = new Html5Qrcode('reader', { formatsToSupport: [F.CODE_128, F.CODE_39, F.EAN_13, F.EAN_8, F.QR_CODE, F.ITF, F.CODABAR, F.UPC_A], verbose: false });
+  scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 120 } }, async text => {
+    const now = Date.now();
+    if (scanBusy || (text === lastCode && now - lastAt < 3000)) return;
+    lastCode = text; lastAt = now; scanBusy = true;
+    const el = $('#slast'); if (el) el.textContent = 'Последний: ' + text;
+    await doScan(text); scanBusy = false;
+  }).catch(e => { toast('Нет доступа к камере: ' + (e.message || e), 'bad'); });
+}
+function stopScanner() {
+  if (scanner) { const s = scanner; scanner = null; try { s.stop().then(() => s.clear()).catch(() => {}); } catch (e) {} }
+}
+
+// ---------- фото ----------
+async function compress(file) {
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); });
+  const max = 1280, k = Math.min(1, max / Math.max(img.width, img.height));
+  const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+  cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+  URL.revokeObjectURL(img.src);
+  return await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.8));
+}
+async function uploadPhoto(file, prefix) {
+  const blob = await compress(file);
+  const path = 'fa/' + prefix.replace(/[^A-Za-z0-9_-]/g, '') + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '.jpg';
+  const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+  if (error) throw new Error('Фото не загрузилось: ' + error.message);
+  return path;
+}
+function openPhoto(mid) {
+  const m = S.models[mid], c = S.catById[m.cat];
+  const canSet = !m.photo || isAdmin();
+  const sh = modal(`<h3>${esc(m.name)}</h3><div class="sm mut" style="margin-bottom:8px">${esc(c.name)}</div>
+    ${m.photo ? '<img class="big" src="' + esc(photoUrl(m.photo)) + '" alt="">' : '<div class="card center mut">' + faIcon(c.icon, 64) + '<div style="margin-top:8px">Фото этой модели ещё нет. Сфотографируйте её — снимок станет образцом для всех точек.</div></div>'}
+    <input id="pf" type="file" accept="image/*" capture="environment" style="display:none">
+    <div style="display:flex;gap:8px;margin-top:12px">${canSet ? '<button class="pri" id="pt" style="flex:1">📷 ' + (m.photo ? 'Заменить фото' : 'Сфотографировать') + '</button>' : ''}<button id="px" style="flex:${canSet ? 'none' : '1'}">Закрыть</button></div>`);
+  $('#px', sh).onclick = closeModal;
+  if (canSet) {
+    $('#pt', sh).onclick = () => $('#pf', sh).click();
+    $('#pf', sh).onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      $('#pt', sh).disabled = true; $('#pt', sh).textContent = 'Загрузка…';
+      try {
+        const path = await uploadPhoto(f, 'm' + mid);
+        const r = await rpc('fa_set_photo', Object.assign(cred(), { p_point: S.cur.code, p_model: mid, p_path: path }));
+        m.photo = r.path; closeModal(); toast('Фото сохранено', 'ok'); renderPoint();
+      } catch (err) { toast(err.message, 'bad'); $('#pt', sh).disabled = false; }
+    };
+  }
+}
+
+// ---------- итоги ----------
+function resHtml(r) {
+  const sec = (t, arr, f) => '<h4>' + t + ' <span class="pill">' + arr.length + '</span></h4>' + (arr.length ? arr.map(f).join('') : '<div class="mut sm">Нет</div>');
+  return '<div class="res"><div class="sm mut">По учёту ' + r.booked + ' · подтверждено на месте ' + r.here + '</div>'
+    + sec('Перемещения (числятся в другом месте)', r.moved, x => '<div class="r"><b>' + esc(x.inv) + '</b> ' + esc(x.model) + '<div class="sm mut">из: ' + esc(x.from_name || x.from) + '</div></div>')
+    + sec('Недостачи', r.shortage, x => '<div class="r">' + esc(x.model) + ' — <b>' + x.qty + ' шт.</b>' + (x.invs.length ? '<div class="sm mut">не отсканированы: ' + x.invs.map(esc).join(', ') + (x.nolabel ? ' (без наклейки найдено ' + x.nolabel + ')' : '') + '</div>' : '') + '</div>')
+    + sec('Излишки', r.surplus, x => '<div class="r">' + esc(x.model) + ' — <b>' + x.qty + ' шт.</b><div class="sm mut">' + ({ unknown: 'номер ' + esc(x.inv) + ' нет в реестре', custom: 'нет в справочнике', nolabel: 'без наклейки, сверх учёта', qty: 'больше, чем по учёту' }[x.kind] || '') + (x.note ? ' · ' + esc(x.note) : '') + '</div>' + (x.photo ? '<img src="' + esc(photoUrl(x.photo)) + '" style="max-width:120px;border-radius:8px;margin-top:4px">' : '') + '</div>')
+    + '</div>';
+}
+async function showResults() {
+  try {
+    const r = await rpc('fa_results', Object.assign(cred(), { p_point: S.cur.code }));
+    const sh = modal('<h3>Итоги: ' + esc(S.cur.point.name) + '</h3>' + resHtml(r) + `
+      <div style="display:flex;gap:8px;margin-top:16px">${closed() ? (isAdmin() ? '<button id="ro" style="flex:1">Открыть опись заново</button>' : '')
+        : '<button class="pri" id="cl" style="flex:1">Закрыть опись</button>'}<button id="rx">Назад</button></div>
+      ${closed() ? '' : '<div class="sm mut" style="margin-top:8px">Закрывайте, когда всё на точке проверено. После закрытия изменения не принимаются.</div>'}`);
+    $('#rx', sh).onclick = closeModal;
+    const cl = $('#cl', sh); if (cl) cl.onclick = async () => {
+      if (!confirm('Закрыть опись по точке «' + S.cur.point.name + '»?')) return;
+      try { await rpc('fa_close', Object.assign(cred(), { p_point: S.cur.code })); closeModal(); toast('Опись закрыта', 'ok'); await reload(); } catch (e) { toast(e.message, 'bad'); }
+    };
+    const ro = $('#ro', sh); if (ro) ro.onclick = async () => {
+      try { await rpc('fa_admin_reopen', { p_pw: S.auth.pin, p_point: S.cur.code }); closeModal(); await reload(); } catch (e) { toast(e.message, 'bad'); }
+    };
+  } catch (e) { toast(e.message, 'bad'); }
+}
+
+// ---------- админ ----------
+async function renderAdmin() {
+  const t = S.adminTab;
+  $('#app').innerHTML = `
+  <header class="top"><div class="row"><h1>Инвентаризация · админ</h1><button class="ghost sm" id="lo">Выйти</button></div></header>
+  <div class="wrap"><div class="tabs">${[['points', 'Точки'], ['users', 'Пользователи'], ['export', 'Выгрузка'], ['registry', 'Реестр'], ['pw', 'Пароль']]
+    .map(([k, n]) => '<button class="sm ' + (k === t ? 'on' : '') + '" data-tab="' + k + '">' + n + '</button>').join('')}</div><div id="adm"></div></div>`;
+  $('#lo').onclick = logout;
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S.adminTab = b.dataset.tab; renderAdmin(); });
+  const box = $('#adm');
+  try {
+    if (t === 'points') admPoints(box);
+    else if (t === 'users') await admUsers(box);
+    else if (t === 'export') admExport(box);
+    else if (t === 'registry') await admRegistry(box);
+    else admPw(box);
+  } catch (e) { box.innerHTML = '<div class="card err">' + esc(e.message) + '</div>'; }
+}
+
+function admPoints(box) {
+  const st = { new: 0, open: 0, closed: 0 }; S.points.forEach(p => st[p.status]++);
+  box.innerHTML = `<div class="card sm">Точек: ${S.points.length} · не начато ${st.new} · идёт ${st.open} · закрыто ${st.closed}</div>
+    <input id="pq" placeholder="Поиск точки или МОЛ…" style="margin:6px 0">
+    <div id="pl"></div>`;
+  const draw = q => {
+    const f = S.points.filter(p => !q || (p.name + ' ' + p.code + ' ' + (p.mol || '')).toLowerCase().includes(q));
+    $('#pl').innerHTML = f.map(p => pointCard(p).replace('</div>' + statusPill(p), '</div>' + statusPill(p) + '<button class="ghost sm" data-ren="' + esc(p.code) + '">✎</button>')).join('');
+    document.querySelectorAll('[data-pt]').forEach(el => el.onclick = e => { if (!e.target.closest('[data-ren]')) openPoint(el.dataset.pt); });
+    document.querySelectorAll('[data-ren]').forEach(b => b.onclick = async e => {
+      e.stopPropagation(); const p = S.points.find(x => x.code === b.dataset.ren);
+      const n = prompt('Название точки (код ' + p.code + ')', p.name); if (!n) return;
+      try { await rpc('fa_admin_point_rename', { p_pw: S.auth.pin, p_point: p.code, p_new: n }); p.name = n.trim(); draw($('#pq').value.toLowerCase()); } catch (er) { toast(er.message, 'bad'); }
+    });
+  };
+  draw(''); $('#pq').oninput = e => draw(e.target.value.trim().toLowerCase());
+}
+
+async function admUsers(box) {
+  const d = await rpc('fa_admin_users', { p_pw: S.auth.pin });
+  const pname = c => { const p = S.points.find(x => x.code === c); return p ? p.name : c; };
+  box.innerHTML = `<button class="pri" id="nu">+ Новый пользователь</button>
+    ${d.users.map(u => `<div class="card"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1"><b>${esc(u.name)}</b>${u.active ? '' : ' <span class="pill">отключён</span>'}
+      <div class="sm mut">${u.points.length ? u.points.map(pname).map(esc).join(', ') : 'точки не закреплены'}</div></div><button class="sm" data-eu="${u.id}">Изменить</button></div></div>`).join('')
+      || '<div class="card mut">Пользователей пока нет.</div>'}`;
+  $('#nu').onclick = () => userForm(null, d);
+  box.querySelectorAll('[data-eu]').forEach(b => b.onclick = () => userForm(d.users.find(u => u.id === +b.dataset.eu), d));
+}
+function userForm(u, d) {
+  const sel = new Set(u ? u.points : []);
+  const sh = modal(`<h3>${u ? 'Пользователь' : 'Новый пользователь'}</h3>
+    <label class="sm mut">Имя (для входа)</label><input id="un" value="${esc(u ? u.name : '')}" style="margin:4px 0 10px">
+    <label class="sm mut">PIN (4–8 цифр)${u ? ' — оставьте пустым, чтобы не менять' : ''}</label><input id="up" inputmode="numeric" style="margin:4px 0 10px">
+    <label class="sm mut">Быстро: все точки МОЛ по учёту</label>
+    <select id="um" style="margin:4px 0 10px"><option value="">— выберите МОЛ —</option>${d.mols.map((m, i) => '<option value="' + i + '">' + esc(m.mol) + ' (' + m.points.length + ')</option>').join('')}</select>
+    <label class="sm mut">Точки</label><div class="ptl" id="ul">${S.points.map(p => '<label><input type="checkbox" value="' + esc(p.code) + '" ' + (sel.has(p.code) ? 'checked' : '') + '>' + esc(p.name) + ' <span class="mut sm">' + esc(p.code) + '</span></label>').join('')}</div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="ua" style="width:auto" ${!u || u.active ? 'checked' : ''}>Активен</label>
+    <div style="display:flex;gap:8px;margin-top:14px"><button class="pri" id="us" style="flex:1">Сохранить</button>${u ? '<button id="ud">Удалить</button>' : ''}<button id="ux">Отмена</button></div>`);
+  $('#um', sh).onchange = e => { const m = d.mols[+e.target.value]; if (!m) return; m.points.forEach(c => { const cb = sh.querySelector('#ul input[value="' + c + '"]'); if (cb) cb.checked = true; }); };
+  $('#ux', sh).onclick = closeModal;
+  $('#us', sh).onclick = async () => {
+    const pts = [...sh.querySelectorAll('#ul input:checked')].map(x => x.value);
+    try {
+      await rpc('fa_admin_user_save', { p_pw: S.auth.pin, p_id: u ? u.id : null, p_user: $('#un', sh).value, p_upin: $('#up', sh).value, p_points: pts, p_active: $('#ua', sh).checked });
+      closeModal(); toast('Сохранено', 'ok'); renderAdmin();
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+  const del = $('#ud', sh); if (del) del.onclick = async () => {
+    if (!confirm('Удалить пользователя «' + u.name + '»? Его отметки в описях останутся.')) return;
+    try { await rpc('fa_admin_user_delete', { p_pw: S.auth.pin, p_id: u.id }); closeModal(); renderAdmin(); } catch (e) { toast(e.message, 'bad'); }
+  };
+}
+
+function admExport(box) {
+  box.innerHTML = `<div class="card"><b>Выгрузка итогов</b><div class="sm mut" style="margin:6px 0 10px">Перемещения, недостачи и излишки по всем начатым точкам — файл CSV для Excel (разделитель «;»).</div>
+    <button class="pri" id="ex">Скачать CSV</button></div>`;
+  $('#ex').onclick = async () => {
+    try {
+      const d = await rpc('fa_admin_export', { p_pw: S.auth.pin });
+      const rows = [['Тип', 'Код точки', 'Точка', 'Статус описи', 'Инв. №', 'Модель', 'Кол-во', 'Откуда (по учёту)', 'Комментарий']];
+      d.points.forEach(p => {
+        const st = p.status === 'closed' ? 'закрыта' : 'идёт';
+        p.moved.forEach(x => rows.push(['Перемещение', p.code, p.name, st, x.inv, x.model, 1, (x.from || '') + ' ' + (x.from_name || ''), '']));
+        p.shortage.forEach(x => rows.push(['Недостача', p.code, p.name, st, x.invs.join(', '), x.model, x.qty, '', x.nolabel ? 'без наклейки найдено ' + x.nolabel : '']));
+        p.surplus.forEach(x => rows.push(['Излишек', p.code, p.name, st, x.inv || '', x.model, x.qty, '', ({ unknown: 'номера нет в реестре', custom: 'нет в справочнике', nolabel: 'без наклейки сверх учёта', qty: 'больше, чем по учёту' }[x.kind] || '') + (x.note ? '; ' + x.note : '') + (x.photo ? '; фото: ' + photoUrl(x.photo) : '')]));
+      });
+      const csv = '﻿' + rows.map(r => r.map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(';')).join('\r\n');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      a.download = 'inventarizaciya_' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
+      toast('Строк: ' + (rows.length - 1), 'ok');
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+}
+
+async function admRegistry(box) {
+  const s = await rpc('fa_admin_stats', { p_pw: S.auth.pin });
+  box.innerHTML = `<div class="card"><b>Реестр в базе</b><div class="sm mut" style="margin-top:6px">Карточек: ${s.assets} · моделей: ${s.models} · точек: ${s.points} · пользователей: ${s.users} · отметок: ${s.lines}</div></div>
+    <div class="card"><b>Загрузить реестр из файла registry.json</b><div class="sm mut" style="margin:6px 0 10px">Выгрузка Armsoft на 24.11.2026 (4 550 действующих карточек). Повторная загрузка обновит карточки, фото и отметки сохранятся.</div>
+    <button class="pri" id="rg">Загрузить</button><div id="rgs" class="sm" style="margin-top:8px"></div></div>`;
+  $('#rg').onclick = async () => {
+    const out = $('#rgs'), btn = $('#rg'); btn.disabled = true;
+    try {
+      out.textContent = 'Скачиваю файл…';
+      const reg = await (await fetch('registry.json', { cache: 'no-store' })).json();
+      const send = async (part, rows) => { for (let i = 0; i < rows.length; i += 1000) { out.textContent = part + ': ' + Math.min(i + 1000, rows.length) + ' / ' + rows.length; await rpc('fa_admin_seed', { p_pw: S.auth.pin, p_part: part, p_rows: rows.slice(i, i + 1000) }); } };
+      await send('categories', reg.categories); await send('points', reg.points); await send('models', reg.models); await send('assets', reg.assets);
+      out.textContent = 'Готово. Войдите заново, чтобы обновить справочники.'; toast('Реестр загружен', 'ok');
+    } catch (e) { out.textContent = ''; toast(e.message, 'bad'); btn.disabled = false; }
+  };
+}
+
+function admPw(box) {
+  box.innerHTML = `<div class="card"><b>Сменить пароль администратора</b>
+    <input id="np" type="password" placeholder="Новый пароль (минимум 8 символов)" style="margin:10px 0"><button class="pri" id="nb">Сохранить</button></div>`;
+  $('#nb').onclick = async () => {
+    const v = $('#np').value;
+    try { await rpc('fa_admin_set_pw', { p_pw: S.auth.pin, p_new: v }); S.auth.pin = v; store('fa_auth', { name: '@admin', pin: v }); toast('Пароль изменён', 'ok'); $('#np').value = ''; } catch (e) { toast(e.message, 'bad'); }
+  };
+}
+
+// ---------- старт ----------
+(async () => {
+  if (!sb) { $('#app').innerHTML = '<div class="wrap"><div class="card err">Не удалось загрузить страницу. Проверьте интернет и обновите её.</div></div>'; return; }
+  const a = load('fa_auth');
+  if (a) { try { S.loginAdmin = a.name === '@admin'; await doLogin(a.name, a.pin); return; } catch (e) { store('fa_auth', null); } }
+  viewLogin();
+})();
+</script>
+</body>
+</html>
