@@ -83,7 +83,7 @@ header.top h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;
 const SUPABASE_URL = 'https://ksybudrrabwpwvazgdst.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__cZjpex3yphF5nJpLZMJhw_jhQGlGU_';
 const BUCKET = 'fa-photos';
-const APP_V = '8'; // при каждом обновлении менять вместе с version.json
+const APP_V = '9'; // при каждом обновлении менять вместе с version.json
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const S = { auth: null, points: [], cats: [], catById: {}, models: {}, cur: null, view: 'login',
@@ -453,7 +453,7 @@ function loadOcr() {
 async function openScanner() {
   modal(`<h3>Сканирование номера</h3>
     <div id="reader" style="position:relative"><video id="svid" playsinline muted autoplay style="width:100%;display:block"></video>
-      <div style="position:absolute;left:6%;right:6%;top:32%;bottom:32%;border:3px solid rgba(255,255,255,.9);border-radius:10px;box-shadow:0 0 0 2000px rgba(0,0,0,.25)"></div></div>
+      <div style="position:absolute;left:15%;right:15%;top:20%;bottom:20%;border:3px solid rgba(255,255,255,.9);border-radius:10px;box-shadow:0 0 0 2000px rgba(0,0,0,.25)"></div></div>
     <div id="sst" class="sm mut" style="margin-top:8px">Запускаю камеру…</div>
     <div id="sseen" class="sm" style="margin-top:4px;min-height:20px"></div>
     <div id="slast" class="sm" style="margin-top:2px"></div>
@@ -493,8 +493,8 @@ async function openScanner() {
   // кадр из рамки в исходном разрешении; scale — увеличение (цифры для OCR должны быть крупными)
   const grab = (scale) => {
     const vw = video.videoWidth, vh = video.videoHeight;
-    const sx = Math.floor(vw * 0.06), sw = Math.floor(vw * 0.88), sy = Math.floor(vh * 0.30), sh = Math.floor(vh * 0.40);
-    const k = Math.min(scale, 2600 / sw); cv.width = Math.floor(sw * k); cv.height = Math.floor(sh * k);
+    const sx = Math.floor(vw * 0.15), sw = Math.floor(vw * 0.70), sy = Math.floor(vh * 0.20), sh = Math.floor(vh * 0.60);
+    const k = Math.min(scale, 3000 / sw); cv.width = Math.floor(sw * k); cv.height = Math.floor(sh * k);
     cx.imageSmoothingQuality = 'high';
     cx.drawImage(video, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
     return cv;
@@ -525,7 +525,7 @@ async function openScanner() {
         // 2) цифры: по очереди в исходном размере и с увеличением ×2
         if (ocrWorker) {
           frameNo++;
-          if (frameNo % 2 === 0) grab(2);
+          grab(frameNo % 2 ? 1.5 : 2.5);
           const { data } = await ocrWorker.recognize(cv);
           const tokens = (data.text || '').match(/\d{3,6}(?:-\d{1,3})?/g) || [];
           const found = tokens.map(t => [t, matchInv(t)]);
