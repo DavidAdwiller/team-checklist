@@ -271,7 +271,7 @@ function renderPoint() {
       <select id="addcat" style="margin-top:4px"><option value="">Выберите категорию…</option>${rest.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('')}</select></div>`}
   </div>
   ${closed() ? '' : `<div class="scanbar"><div class="row"><button class="pri" id="cam">📷 Скан</button>
-     <input id="inv" placeholder="или введите номер" inputmode="numeric" autocomplete="off"><button id="invb">OK</button></div></div>`}`;
+     <input id="inv" placeholder="или введите номер" autocomplete="off"><button id="invb">OK</button></div></div>`}`;
   bindPoint();
 }
 
@@ -377,8 +377,19 @@ async function doScan(code) {
     else if (r.status === 'moved') toast('→ ' + r.inv + ' числится: ' + (r.from || '') + '. Отмечено как перемещение', 'mv');
     else if (r.status === 'already') toast(r.inv + ' уже отмечен');
     else if (r.status === 'unknown') { stopScanner(); unknownFlow(r.inv); return; }
+    else if (r.status === 'choose') { stopScanner(); chooseInv(r); return; }
     if (r.status !== 'already') await reload();
   } catch (e) { toast(e.message, 'bad'); }
+}
+
+// номер введён без нулей и подходит к нескольким карточкам
+function chooseInv(r) {
+  const sh = modal(`<h3>Номер «${esc(r.inv)}» подходит к нескольким карточкам</h3>
+    <div class="sm mut">Выберите номер, который напечатан на наклейке.</div>
+    <div class="list" style="margin-top:8px">${r.options.map(o => '<div class="it" data-inv="' + esc(o.inv) + '"><b style="min-width:90px">' + esc(o.inv) + '</b><div>' + esc(o.model) + '<div class="sm mut">числится: ' + esc(o.point) + '</div></div></div>').join('')}</div>
+    <div class="center" style="margin-top:10px"><button class="ghost" id="chx">Отмена</button></div>`);
+  $('#chx', sh).onclick = closeModal;
+  sh.querySelectorAll('[data-inv]').forEach(el => el.onclick = () => { closeModal(); doScan(el.dataset.inv); });
 }
 
 function unknownFlow(inv) {
