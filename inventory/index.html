@@ -83,7 +83,7 @@ header.top h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;
 const SUPABASE_URL = 'https://ksybudrrabwpwvazgdst.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__cZjpex3yphF5nJpLZMJhw_jhQGlGU_';
 const BUCKET = 'fa-photos';
-const APP_V = '7'; // при каждом обновлении менять вместе с version.json
+const APP_V = '8'; // при каждом обновлении менять вместе с version.json
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const S = { auth: null, points: [], cats: [], catById: {}, models: {}, cur: null, view: 'login',
@@ -490,20 +490,16 @@ async function openScanner() {
 
   // кадр из рамки → чёрно-белое изображение для OCR и штрихкода
   const cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
-  const grab = () => {
+  // кадр из рамки в исходном разрешении; scale — увеличение (цифры для OCR должны быть крупными)
+  const grab = (scale) => {
     const vw = video.videoWidth, vh = video.videoHeight;
     const sx = Math.floor(vw * 0.06), sw = Math.floor(vw * 0.88), sy = Math.floor(vh * 0.30), sh = Math.floor(vh * 0.40);
-    const scale = Math.min(1, 1000 / sw); cv.width = Math.floor(sw * scale); cv.height = Math.floor(sh * scale);
+    const k = Math.min(scale, 2600 / sw); cv.width = Math.floor(sw * k); cv.height = Math.floor(sh * k);
+    cx.imageSmoothingQuality = 'high';
     cx.drawImage(video, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
     return cv;
   };
-  const binarize = () => {
-    const img = cx.getImageData(0, 0, cv.width, cv.height), d = img.data; let sum = 0;
-    for (let i = 0; i < d.length; i += 4) { const g = d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11; d[i] = g; sum += g; }
-    const thr = sum / (d.length / 4) * 0.85;
-    for (let i = 0; i < d.length; i += 4) { const v = d[i] < thr ? 0 : 255; d[i] = d[i + 1] = d[i + 2] = v; }
-    cx.putImageData(img, 0, 0);
-  };
+  let frameNo = 0;
 
   let prev = '', prevAt = 0;
   const accept = async (inv, how) => {
@@ -518,7 +514,7 @@ async function openScanner() {
     if (me.stop || scanner !== me) return;
     if (video.readyState >= 2 && !scanBusy) {
       try {
-        grab();
+        grab(1);
         // 1) штрихкод — если читается, сразу
         if (det) {
           const codes = await det.detect(cv);
@@ -526,9 +522,10 @@ async function openScanner() {
           const m = t && matchInv(t);
           if (m) { await accept(m, 'штрихкод'); setTimeout(loop, 300); return; }
         }
-        // 2) цифры
+        // 2) цифры: по очереди в исходном размере и с увеличением ×2
         if (ocrWorker) {
-          binarize();
+          frameNo++;
+          if (frameNo % 2 === 0) grab(2);
           const { data } = await ocrWorker.recognize(cv);
           const tokens = (data.text || '').match(/\d{3,6}(?:-\d{1,3})?/g) || [];
           const found = tokens.map(t => [t, matchInv(t)]);
