@@ -420,19 +420,28 @@ let scanner = null, lastCode = '', lastAt = 0, scanBusy = false;
 function openScanner() {
   if (!window.Html5Qrcode) { toast('Сканер не загрузился. Введите номер вручную.', 'bad'); return; }
   modal(`<h3>Сканирование</h3><div id="reader"></div>
-    <div class="sm mut" style="margin-top:8px">Наведите камеру на штрихкод. Можно сканировать подряд.</div>
+    <div id="sst" class="sm mut" style="margin-top:8px">Запускаю камеру…</div>
     <div id="slast" class="sm" style="margin-top:6px"></div>
+    <div style="display:flex;gap:8px;margin-top:10px"><input id="sman" placeholder="Не читается? Введите номер"><button id="smb">OK</button></div>
     <div class="center" style="margin-top:10px"><button id="sx">Готово</button></div>`);
   $('#sx').onclick = closeModal;
+  const man = () => { const v = $('#sman').value.trim(); if (v) { $('#sman').value = ''; doScan(v); } };
+  $('#smb').onclick = man; $('#sman').onkeydown = e => { if (e.key === 'Enter') man(); };
   const F = Html5QrcodeSupportedFormats;
-  scanner = new Html5Qrcode('reader', { formatsToSupport: [F.CODE_128, F.CODE_39, F.EAN_13, F.EAN_8, F.QR_CODE, F.ITF, F.CODABAR, F.UPC_A], verbose: false });
-  scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 120 } }, async text => {
+  scanner = new Html5Qrcode('reader', {
+    formatsToSupport: [F.CODE_128, F.CODE_39, F.CODE_93, F.EAN_13, F.EAN_8, F.QR_CODE, F.DATA_MATRIX, F.ITF, F.CODABAR, F.UPC_A, F.UPC_E],
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true }, verbose: false });
+  // рамка — почти во всю ширину видео, низкая: под линейный штрихкод
+  const box = (w, h) => ({ width: Math.max(200, Math.floor(w * 0.9)), height: Math.max(120, Math.floor(h * 0.45)) });
+  scanner.start({ facingMode: 'environment' }, { fps: 15, qrbox: box, aspectRatio: 1.333 }, async text => {
     const now = Date.now();
     if (scanBusy || (text === lastCode && now - lastAt < 3000)) return;
     lastCode = text; lastAt = now; scanBusy = true;
-    const el = $('#slast'); if (el) el.textContent = 'Последний: ' + text;
+    const el = $('#slast'); if (el) el.textContent = 'Считано: ' + text;
     await doScan(text); scanBusy = false;
-  }).catch(e => { toast('Нет доступа к камере: ' + (e.message || e), 'bad'); });
+  }).then(() => { const s = $('#sst'); if (s) s.textContent = 'Камера работает. Держите штрихкод в рамке, 10–20 см от камеры, без бликов.'; })
+    .catch(e => { const s = $('#sst'); const msg = 'Камера не запустилась: ' + (e && e.message ? e.message : e) + '. Разрешите доступ к камере в браузере или введите номер вручную.';
+      if (s) { s.textContent = msg; s.style.color = 'var(--bad)'; } toast('Камера не запустилась', 'bad'); });
 }
 function stopScanner() {
   if (scanner) { const s = scanner; scanner = null; try { s.stop().then(() => s.clear()).catch(() => {}); } catch (e) {} }
