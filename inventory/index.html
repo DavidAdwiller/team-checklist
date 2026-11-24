@@ -83,7 +83,7 @@ header.top h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;
 const SUPABASE_URL = 'https://ksybudrrabwpwvazgdst.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__cZjpex3yphF5nJpLZMJhw_jhQGlGU_';
 const BUCKET = 'fa-photos';
-const APP_V = '6'; // при каждом обновлении менять вместе с version.json
+const APP_V = '7'; // при каждом обновлении менять вместе с version.json
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const S = { auth: null, points: [], cats: [], catById: {}, models: {}, cur: null, view: 'login',
@@ -161,7 +161,7 @@ async function doLogin(name, pin) {
   store('fa_auth', { name, pin });
   if (isAdmin()) { S.view = 'admin'; renderAdmin(); } else { S.view = 'points'; renderPoints(); }
 }
-function logout() { store('fa_auth', null); S.auth = null; S.cur = null; S.view = 'login'; viewLogin(); }
+function logout() { INV_SET = null; store('fa_auth', null); S.auth = null; S.cur = null; S.view = 'login'; viewLogin(); }
 
 async function refreshPoints() {
   const a = load('fa_auth'); const d = await rpc('fa_login', { p_name: a.name, p_pin: a.pin });
@@ -417,27 +417,54 @@ function unknownFlow(inv) {
   });
 }
 
-// Сканер: поток с камеры + BarcodeDetector (встроенный в браузер или zxing-cpp из polyfill — работает и на iPhone)
+// Сканер: читает напечатанный номер (OCR, цифры) и сверяет с реестром.
+// Параллельно пробует штрихкод (BarcodeDetector / zxing-cpp) — что сработает первым.
 let scanner = null, lastCode = '', lastAt = 0, scanBusy = false;
 const SCAN_FORMATS = ['code_128', 'code_39', 'code_93', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf', 'codabar', 'qr_code', 'data_matrix'];
+let INV_SET = null, INV_BY_TRIM = null, ocrWorker = null, ocrLoading = null;
+
+async function loadInvs() {
+  if (INV_SET) return;
+  const d = await rpc('fa_inv_list', cred());
+  INV_SET = new Set(d.invs || []); INV_BY_TRIM = new Map();
+  (d.invs || []).forEach(i => { const k = i.replace(/^0+/, ''); INV_BY_TRIM.set(k, INV_BY_TRIM.has(k) ? null : i); });
+}
+// номер из реестра: точное совпадение, либо единственный с тем же числом без ведущих нулей
+function matchInv(t) {
+  if (!INV_SET) return null;
+  if (INV_SET.has(t)) return t;
+  const m = INV_BY_TRIM.get(t.replace(/^0+/, ''));
+  return m || null;
+}
+function loadOcr() {
+  if (ocrWorker) return Promise.resolve(ocrWorker);
+  if (ocrLoading) return ocrLoading;
+  ocrLoading = (async () => {
+    if (!window.Tesseract) await new Promise((ok, no) => { const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+    const w = await Tesseract.createWorker('eng', 1);
+    await w.setParameters({ tessedit_char_whitelist: '0123456789-', tessedit_pageseg_mode: '11' });
+    ocrWorker = w; return w;
+  })();
+  ocrLoading.catch(() => { ocrLoading = null; });
+  return ocrLoading;
+}
+
 async function openScanner() {
-  modal(`<h3>Сканирование</h3>
+  modal(`<h3>Сканирование номера</h3>
     <div id="reader" style="position:relative"><video id="svid" playsinline muted autoplay style="width:100%;display:block"></video>
       <div style="position:absolute;left:6%;right:6%;top:32%;bottom:32%;border:3px solid rgba(255,255,255,.9);border-radius:10px;box-shadow:0 0 0 2000px rgba(0,0,0,.25)"></div></div>
     <div id="sst" class="sm mut" style="margin-top:8px">Запускаю камеру…</div>
-    <div id="slast" class="sm" style="margin-top:6px"></div>
+    <div id="sseen" class="sm" style="margin-top:4px;min-height:20px"></div>
+    <div id="slast" class="sm" style="margin-top:2px"></div>
     <div style="display:flex;gap:8px;margin-top:10px"><input id="sman" placeholder="Не читается? Введите номер"><button id="smb">OK</button></div>
     <div class="center" style="margin-top:10px"><button id="sx">Готово</button></div>`);
   $('#sx').onclick = closeModal;
   const man = () => { const v = $('#sman').value.trim(); if (v) { $('#sman').value = ''; doScan(v); } };
   $('#smb').onclick = man; $('#sman').onkeydown = e => { if (e.key === 'Enter') man(); };
   const st = (t, bad) => { const s = $('#sst'); if (s) { s.textContent = t; s.style.color = bad ? 'var(--bad)' : ''; } };
-  if (!('BarcodeDetector' in window)) { st('Распознаватель не загрузился. Обновите страницу или введите номер вручную.', true); return; }
-  let det;
-  try {
-    const sup = await BarcodeDetector.getSupportedFormats();
-    det = new BarcodeDetector({ formats: SCAN_FORMATS.filter(f => sup.includes(f)) });
-  } catch (e) { st('Распознаватель не запустился: ' + e.message, true); return; }
+  const seen = h => { const s = $('#sseen'); if (s) s.innerHTML = h; };
+
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: false,
@@ -450,31 +477,73 @@ async function openScanner() {
   video.srcObject = stream; try { await video.play(); } catch (e) {}
   const track = stream.getVideoTracks()[0];
   try { const caps = track.getCapabilities ? track.getCapabilities() : {}; if (caps.focusMode && caps.focusMode.includes('continuous')) await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
-  st('Камера работает. Держите штрихкод в рамке, 10–20 см от камеры, без бликов.');
-  const cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
   const me = scanner = { stream, stop: false };
+
+  st('Загружаю распознавание цифр…');
+  try { await Promise.all([loadInvs(), loadOcr()]); }
+  catch (e) { st('Не загрузилось распознавание цифр (' + (e.message || e) + '). Обновите страницу или введите номер вручную.', true); }
+  if (me.stop) return;
+  st(ocrWorker ? 'Наведите рамку на номер наклейки (цифры крупно, без бликов).' : 'Работает только штрихкод.');
+
+  let det = null;
+  try { if ('BarcodeDetector' in window) { const sup = await BarcodeDetector.getSupportedFormats(); det = new BarcodeDetector({ formats: SCAN_FORMATS.filter(f => sup.includes(f)) }); } } catch (e) {}
+
+  // кадр из рамки → чёрно-белое изображение для OCR и штрихкода
+  const cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+  const grab = () => {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const sx = Math.floor(vw * 0.06), sw = Math.floor(vw * 0.88), sy = Math.floor(vh * 0.30), sh = Math.floor(vh * 0.40);
+    const scale = Math.min(1, 1000 / sw); cv.width = Math.floor(sw * scale); cv.height = Math.floor(sh * scale);
+    cx.drawImage(video, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+    return cv;
+  };
+  const binarize = () => {
+    const img = cx.getImageData(0, 0, cv.width, cv.height), d = img.data; let sum = 0;
+    for (let i = 0; i < d.length; i += 4) { const g = d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11; d[i] = g; sum += g; }
+    const thr = sum / (d.length / 4) * 0.85;
+    for (let i = 0; i < d.length; i += 4) { const v = d[i] < thr ? 0 : 255; d[i] = d[i + 1] = d[i + 2] = v; }
+    cx.putImageData(img, 0, 0);
+  };
+
+  let prev = '', prevAt = 0;
+  const accept = async (inv, how) => {
+    const now = Date.now();
+    if (inv === lastCode && now - lastAt < 4000) { lastAt = now; return; } // тот же номер ещё в кадре
+    lastCode = inv; lastAt = now; scanBusy = true;
+    const el = $('#slast'); if (el) el.textContent = 'Принято: ' + inv + ' (' + how + ')';
+    await doScan(inv); scanBusy = false;
+  };
+
   const loop = async () => {
     if (me.stop || scanner !== me) return;
     if (video.readyState >= 2 && !scanBusy) {
       try {
-        // распознаём центральную полосу кадра (там рамка) — быстрее и точнее
-        const vw = video.videoWidth, vh = video.videoHeight, sy = Math.floor(vh * 0.25), sh = Math.floor(vh * 0.5);
-        const scale = Math.min(1, 1280 / vw); cv.width = Math.floor(vw * scale); cv.height = Math.floor(sh * scale);
-        cx.drawImage(video, 0, sy, vw, sh, 0, 0, cv.width, cv.height);
-        let codes = await det.detect(cv);
-        if (!codes.length) codes = await det.detect(video); // запасной вариант — весь кадр
-        if (codes.length) {
-          const text = String(codes[0].rawValue || '').trim(), now = Date.now();
-          if (text === lastCode && now - lastAt < 3000) { lastAt = now; } // тот же код всё ещё в кадре — не повторяем
-          else if (text) {
-            lastCode = text; lastAt = now; scanBusy = true;
-            const el = $('#slast'); if (el) el.textContent = 'Считано: ' + text;
-            await doScan(text); scanBusy = false;
+        grab();
+        // 1) штрихкод — если читается, сразу
+        if (det) {
+          const codes = await det.detect(cv);
+          const t = codes.length ? String(codes[0].rawValue || '').trim() : '';
+          const m = t && matchInv(t);
+          if (m) { await accept(m, 'штрихкод'); setTimeout(loop, 300); return; }
+        }
+        // 2) цифры
+        if (ocrWorker) {
+          binarize();
+          const { data } = await ocrWorker.recognize(cv);
+          const tokens = (data.text || '').match(/\d{3,6}(?:-\d{1,3})?/g) || [];
+          const found = tokens.map(t => [t, matchInv(t)]);
+          const ok = found.find(f => f[1]);
+          seen(found.length ? 'Вижу: ' + found.map(([t, m]) => m ? '<b style="color:var(--ok)">' + esc(m) + ' ✓</b>' : '<span class="mut">' + esc(t) + ' — нет в реестре</span>').join(', ') : '<span class="mut">Цифр не вижу</span>');
+          if (ok) {
+            const now = Date.now();
+            // засчитываем, когда тот же номер прочитан дважды подряд — защита от ошибочной цифры
+            if (ok[1] === prev && now - prevAt < 5000) { prev = ''; await accept(ok[1], 'по цифрам'); }
+            else { prev = ok[1]; prevAt = now; }
           }
         }
-      } catch (e) { /* кадр не готов — пробуем следующий */ }
+      } catch (e) { /* пропускаем кадр */ }
     }
-    setTimeout(loop, 120);
+    setTimeout(loop, ocrWorker ? 150 : 250);
   };
   loop();
 }
