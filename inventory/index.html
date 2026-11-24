@@ -83,7 +83,7 @@ header.top h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;
 const SUPABASE_URL = 'https://ksybudrrabwpwvazgdst.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__cZjpex3yphF5nJpLZMJhw_jhQGlGU_';
 const BUCKET = 'fa-photos';
-const APP_V = '4'; // при каждом обновлении менять вместе с version.json
+const APP_V = '5'; // при каждом обновлении менять вместе с version.json
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const S = { auth: null, points: [], cats: [], catById: {}, models: {}, cur: null, view: 'login',
@@ -465,7 +465,8 @@ async function openScanner() {
         if (!codes.length) codes = await det.detect(video); // запасной вариант — весь кадр
         if (codes.length) {
           const text = String(codes[0].rawValue || '').trim(), now = Date.now();
-          if (text && !(text === lastCode && now - lastAt < 3000)) {
+          if (text === lastCode && now - lastAt < 3000) { lastAt = now; } // тот же код всё ещё в кадре — не повторяем
+          else if (text) {
             lastCode = text; lastAt = now; scanBusy = true;
             const el = $('#slast'); if (el) el.textContent = 'Считано: ' + text;
             await doScan(text); scanBusy = false;
