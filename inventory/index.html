@@ -57,7 +57,7 @@ header.top h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;
 .list .it:hover{background:#faf9f6}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:90px;z-index:60;padding:10px 16px;border-radius:12px;color:#fff;background:#333;max-width:92vw;box-shadow:0 4px 18px rgba(0,0,0,.2);font-weight:500}
 .toast.ok{background:var(--ok)} .toast.mv{background:var(--warn)} .toast.bad{background:var(--bad)}
-#reader{width:100%;border-radius:12px;overflow:hidden;background:#000;min-height:220px}
+#reader{width:100%;border-radius:12px;overflow:hidden;background:#000;min-height:220px}#svid{max-height:55vh;object-fit:cover}
 .big{width:100%;max-height:65vh;object-fit:contain;border-radius:12px;background:#f0efea}
 .tabs{display:flex;gap:6px;overflow:auto;margin:6px 0}
 .tabs button{white-space:nowrap}.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
@@ -76,13 +76,14 @@ header.top h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;
 <div id="app"></div>
 <div id="modal-root"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/barcode-detector@3/dist/iife/polyfill.min.js"></script>
 <script src="icons.js"></script>
 <script>
 'use strict';
 const SUPABASE_URL = 'https://ksybudrrabwpwvazgdst.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__cZjpex3yphF5nJpLZMJhw_jhQGlGU_';
 const BUCKET = 'fa-photos';
+const APP_V = '4'; // при каждом обновлении менять вместе с version.json
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const S = { auth: null, points: [], cats: [], catById: {}, models: {}, cur: null, view: 'login',
@@ -416,10 +417,13 @@ function unknownFlow(inv) {
   });
 }
 
+// Сканер: поток с камеры + BarcodeDetector (встроенный в браузер или zxing-cpp из polyfill — работает и на iPhone)
 let scanner = null, lastCode = '', lastAt = 0, scanBusy = false;
-function openScanner() {
-  if (!window.Html5Qrcode) { toast('Сканер не загрузился. Введите номер вручную.', 'bad'); return; }
-  modal(`<h3>Сканирование</h3><div id="reader"></div>
+const SCAN_FORMATS = ['code_128', 'code_39', 'code_93', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf', 'codabar', 'qr_code', 'data_matrix'];
+async function openScanner() {
+  modal(`<h3>Сканирование</h3>
+    <div id="reader" style="position:relative"><video id="svid" playsinline muted autoplay style="width:100%;display:block"></video>
+      <div style="position:absolute;left:6%;right:6%;top:32%;bottom:32%;border:3px solid rgba(255,255,255,.9);border-radius:10px;box-shadow:0 0 0 2000px rgba(0,0,0,.25)"></div></div>
     <div id="sst" class="sm mut" style="margin-top:8px">Запускаю камеру…</div>
     <div id="slast" class="sm" style="margin-top:6px"></div>
     <div style="display:flex;gap:8px;margin-top:10px"><input id="sman" placeholder="Не читается? Введите номер"><button id="smb">OK</button></div>
@@ -427,24 +431,55 @@ function openScanner() {
   $('#sx').onclick = closeModal;
   const man = () => { const v = $('#sman').value.trim(); if (v) { $('#sman').value = ''; doScan(v); } };
   $('#smb').onclick = man; $('#sman').onkeydown = e => { if (e.key === 'Enter') man(); };
-  const F = Html5QrcodeSupportedFormats;
-  scanner = new Html5Qrcode('reader', {
-    formatsToSupport: [F.CODE_128, F.CODE_39, F.CODE_93, F.EAN_13, F.EAN_8, F.QR_CODE, F.DATA_MATRIX, F.ITF, F.CODABAR, F.UPC_A, F.UPC_E],
-    experimentalFeatures: { useBarCodeDetectorIfSupported: true }, verbose: false });
-  // рамка — почти во всю ширину видео, низкая: под линейный штрихкод
-  const box = (w, h) => ({ width: Math.max(200, Math.floor(w * 0.9)), height: Math.max(120, Math.floor(h * 0.45)) });
-  scanner.start({ facingMode: 'environment' }, { fps: 15, qrbox: box, aspectRatio: 1.333 }, async text => {
-    const now = Date.now();
-    if (scanBusy || (text === lastCode && now - lastAt < 3000)) return;
-    lastCode = text; lastAt = now; scanBusy = true;
-    const el = $('#slast'); if (el) el.textContent = 'Считано: ' + text;
-    await doScan(text); scanBusy = false;
-  }).then(() => { const s = $('#sst'); if (s) s.textContent = 'Камера работает. Держите штрихкод в рамке, 10–20 см от камеры, без бликов.'; })
-    .catch(e => { const s = $('#sst'); const msg = 'Камера не запустилась: ' + (e && e.message ? e.message : e) + '. Разрешите доступ к камере в браузере или введите номер вручную.';
-      if (s) { s.textContent = msg; s.style.color = 'var(--bad)'; } toast('Камера не запустилась', 'bad'); });
+  const st = (t, bad) => { const s = $('#sst'); if (s) { s.textContent = t; s.style.color = bad ? 'var(--bad)' : ''; } };
+  if (!('BarcodeDetector' in window)) { st('Распознаватель не загрузился. Обновите страницу или введите номер вручную.', true); return; }
+  let det;
+  try {
+    const sup = await BarcodeDetector.getSupportedFormats();
+    det = new BarcodeDetector({ formats: SCAN_FORMATS.filter(f => sup.includes(f)) });
+  } catch (e) { st('Распознаватель не запустился: ' + e.message, true); return; }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: false,
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+  } catch (e) {
+    st('Камера не запустилась: ' + (e.name === 'NotAllowedError' ? 'нет разрешения. Разрешите доступ к камере в настройках браузера' : e.message) + '. Можно ввести номер вручную.', true);
+    return;
+  }
+  const video = $('#svid'); if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
+  video.srcObject = stream; try { await video.play(); } catch (e) {}
+  const track = stream.getVideoTracks()[0];
+  try { const caps = track.getCapabilities ? track.getCapabilities() : {}; if (caps.focusMode && caps.focusMode.includes('continuous')) await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
+  st('Камера работает. Держите штрихкод в рамке, 10–20 см от камеры, без бликов.');
+  const cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+  const me = scanner = { stream, stop: false };
+  const loop = async () => {
+    if (me.stop || scanner !== me) return;
+    if (video.readyState >= 2 && !scanBusy) {
+      try {
+        // распознаём центральную полосу кадра (там рамка) — быстрее и точнее
+        const vw = video.videoWidth, vh = video.videoHeight, sy = Math.floor(vh * 0.25), sh = Math.floor(vh * 0.5);
+        const scale = Math.min(1, 1280 / vw); cv.width = Math.floor(vw * scale); cv.height = Math.floor(sh * scale);
+        cx.drawImage(video, 0, sy, vw, sh, 0, 0, cv.width, cv.height);
+        let codes = await det.detect(cv);
+        if (!codes.length) codes = await det.detect(video); // запасной вариант — весь кадр
+        if (codes.length) {
+          const text = String(codes[0].rawValue || '').trim(), now = Date.now();
+          if (text && !(text === lastCode && now - lastAt < 3000)) {
+            lastCode = text; lastAt = now; scanBusy = true;
+            const el = $('#slast'); if (el) el.textContent = 'Считано: ' + text;
+            await doScan(text); scanBusy = false;
+          }
+        }
+      } catch (e) { /* кадр не готов — пробуем следующий */ }
+    }
+    setTimeout(loop, 120);
+  };
+  loop();
 }
 function stopScanner() {
-  if (scanner) { const s = scanner; scanner = null; try { s.stop().then(() => s.clear()).catch(() => {}); } catch (e) {} }
+  if (scanner) { const s = scanner; scanner = null; s.stop = true; try { s.stream.getTracks().forEach(t => t.stop()); } catch (e) {} }
+  scanBusy = false;
 }
 
 // ---------- фото ----------
@@ -635,6 +670,11 @@ function admPw(box) {
 
 // ---------- старт ----------
 (async () => {
+  // если телефон открыл старую версию из кэша — перезагружаемся на свежую
+  try {
+    const v = (await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json()).v;
+    if (v && v !== APP_V && !location.search.includes('v=' + v)) { location.replace(location.pathname + '?v=' + v); return; }
+  } catch (e) {}
   if (!sb) { $('#app').innerHTML = '<div class="wrap"><div class="card err">Не удалось загрузить страницу. Проверьте интернет и обновите её.</div></div>'; return; }
   const a = load('fa_auth');
   if (a) { try { S.loginAdmin = a.name === '@admin'; await doLogin(a.name, a.pin); return; } catch (e) { store('fa_auth', null); } }
