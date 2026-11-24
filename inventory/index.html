@@ -156,7 +156,7 @@ async function doLogin(name, pin) {
   S.points = d.points || [];
   S.cats = d.categories || [];
   S.catById = {}; S.cats.forEach(c => S.catById[c.id] = c);
-  S.models = {}; (d.models || []).forEach(m => S.models[m[0]] = { id: m[0], name: m[1], cat: m[2], photo: m[3] });
+  S.models = {}; (d.models || []).forEach(m => S.models[m[0]] = { id: m[0], name: m[1], cat: m[2], photo: m[3], ex: m[4], exc: m[5] });
   store('fa_auth', { name, pin });
   if (isAdmin()) { S.view = 'admin'; renderAdmin(); } else { S.view = 'points'; renderPoints(); }
 }
@@ -212,8 +212,12 @@ function catData(catId) {
   return { c, models: [...models.values()].sort((a, b) => (b.booked.length - a.booked.length) || S.models[a.id].name.localeCompare(S.models[b.id].name)), custom };
 }
 
+// примерное фото: сначала своё у модели, потом общее для категории
+const example = (m, c) => m.ex ? { url: m.ex, credit: m.exc } : (c.ex ? { url: c.ex, credit: c.exc } : null);
 function modelIcon(m, c) {
-  const inner = m.photo ? '<img src="' + esc(photoUrl(m.photo)) + '" alt="" loading="lazy">' : faIcon(c.icon, 26);
+  const ex = example(m, c);
+  const inner = m.photo ? '<img src="' + esc(photoUrl(m.photo)) + '" alt="" loading="lazy">'
+    : ex ? '<img src="' + esc(ex.url) + '" alt="" loading="lazy" style="opacity:.75">' : faIcon(c.icon, 26);
   return '<button class="mic" data-photo="' + m.id + '" title="Фото модели">' + inner + (m.photo ? '' : '<span class="dot">+</span>') + '</button>';
 }
 
@@ -454,7 +458,9 @@ function openPhoto(mid) {
   const m = S.models[mid], c = S.catById[m.cat];
   const canSet = !m.photo || isAdmin();
   const sh = modal(`<h3>${esc(m.name)}</h3><div class="sm mut" style="margin-bottom:8px">${esc(c.name)}</div>
-    ${m.photo ? '<img class="big" src="' + esc(photoUrl(m.photo)) + '" alt="">' : '<div class="card center mut">' + faIcon(c.icon, 64) + '<div style="margin-top:8px">Фото этой модели ещё нет. Сфотографируйте её — снимок станет образцом для всех точек.</div></div>'}
+    ${m.photo ? '<img class="big" src="' + esc(photoUrl(m.photo)) + '" alt="">'
+      : example(m, c) ? '<img class="big" src="' + esc(example(m, c).url) + '" alt=""><div class="sm mut" style="margin-top:6px"><b>Примерный вид' + (m.ex ? '' : ' («' + esc(c.name) + '»)') + '.</b> Сфотографируйте вашу вещь — снимок станет образцом для всех точек.<br><span style="font-size:11px">Фото: ' + esc(example(m, c).credit || '') + '</span></div>'
+      : '<div class="card center mut">' + faIcon(c.icon, 64) + '<div style="margin-top:8px">Фото этой модели ещё нет. Сфотографируйте её — снимок станет образцом для всех точек.</div></div>'}
     <input id="pf" type="file" accept="image/*" capture="environment" style="display:none">
     <div style="display:flex;gap:8px;margin-top:12px">${canSet ? '<button class="pri" id="pt" style="flex:1">📷 ' + (m.photo ? 'Заменить фото' : 'Сфотографировать') + '</button>' : ''}<button id="px" style="flex:${canSet ? 'none' : '1'}">Закрыть</button></div>`);
   $('#px', sh).onclick = closeModal;
